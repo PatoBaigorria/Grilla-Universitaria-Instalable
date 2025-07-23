@@ -1,4 +1,4 @@
-const CACHE_NAME = 'plan-estudios-v1';
+const CACHE_NAME = 'plan-estudios-v32';
 const urlsToCache = [
   './',
   './index.html',
@@ -32,11 +32,35 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Intercepta requests y responde con cache si está disponible
+// Intercepta requests con estrategia diferente para CSS/JS
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
-  );
+  const url = event.request.url;
+  
+  // Para CSS y JS: NETWORK FIRST (siempre intenta la red primero)
+  if (url.includes('.css') || url.includes('.js')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Si la red funciona, actualiza el cache y devuelve la respuesta
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Solo si la red falla, usar cache como fallback
+          return caches.match(event.request);
+        })
+    );
+  } else {
+    // Para otros archivos: CACHE FIRST (estrategia original)
+    event.respondWith(
+      caches.match(event.request).then(response => {
+        return response || fetch(event.request);
+      })
+    );
+  }
 });

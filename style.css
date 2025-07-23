@@ -10,12 +10,12 @@ body {
     body {
         font-size: 14px;
     }
-    
+
     .container-fluid {
         padding-left: 10px;
         padding-right: 10px;
     }
-    
+
     h1 {
         font-size: 1.8rem;
     }
@@ -34,10 +34,7 @@ body {
     margin-bottom: 10px;
     word-wrap: break-word;
     hyphens: auto;
-
-    /* ESTADO INICIAL PREDETERMINADO (GRIS) para todas las materias NO destacadas */
-    background-color: #e0e0e0;
-    color: #555555;
+    /* Colores se definirán con clases específicas */
 }
 
 /* Ajustes responsivos para materias en tablets */
@@ -50,32 +47,54 @@ body {
         align-items: center;
         justify-content: center;
     }
-    
+
     .year-column {
         margin-bottom: 15px;
     }
-    
+
     .year-title {
         font-size: 1.5rem;
     }
-    
+
     .semester-title {
         font-size: 1rem;
     }
 }
 
-/* Todas las materias del primer año que no están bloqueadas ni cursando ni aprobadas */
-.col-lg-3:first-child .materia:not(.bloqueada):not(.cursando):not(.aprobada) {
-    background-color: #ffc0cb;
-    color: #a5374e;
+/* ========== ESTADOS DE MATERIAS - SISTEMA LIMPIO ========== */
+
+/* MATERIAS HABILITADAS - Rosa fuerte (estado por defecto cuando no está bloqueada, cursando o aprobada) */
+.materia {
+    background-color: #ffc0cb !important; /* Rosa fuerte */
+    color: #a5374e !important; /* Texto rosa oscuro */
 }
 
+/* Regla adicional más específica para materias habilitadas */
+.materia:not(.bloqueada):not(.cursando):not(.aprobada) {
+    background-color: #ffc0cb !important; /* Rosa fuerte */
+    color: #a5374e !important; /* Texto rosa oscuro */
+}
 
-/* Materias Bloqueadas: ahora tienen cursor normal para permitir clics */
+/* MATERIAS BLOQUEADAS - Gris */
 .materia.bloqueada {
-    cursor: pointer;
-    /* Mantenemos el estilo visual pero permitimos clics */
-    opacity: 0.8;
+    background-color: #d0d0d0 !important;
+    color: #1a1a1a !important; /* Gris muy oscuro para mejor legibilidad */
+    opacity: 0.6;
+    cursor: not-allowed !important;
+}
+
+/* MATERIAS CURSANDO - Rosa claro */
+.materia.cursando {
+    background-color: #ffe4e1 !important;
+    color: #a5374e !important;
+    cursor: pointer !important;
+}
+
+/* MATERIAS APROBADAS - Rosa claro con texto grisáceo */
+.materia.aprobada {
+    background-color: #ffe4e1 !important;
+    color: #9e737b !important;
+    cursor: pointer !important;
 }
 
 /* Efecto hover para todas las materias, incluyendo las bloqueadas */
@@ -105,19 +124,19 @@ body {
         padding: 12px 15px;
         margin-bottom: 20px;
     }
-    
+
     .progress-title {
         font-size: 1rem;
     }
-    
+
     .progress-percentage {
         font-size: 1.3rem;
     }
-    
+
     .progress-bar-outer {
         height: 10px;
     }
-    
+
     .progress-details {
         font-size: 0.8rem;
     }
@@ -172,13 +191,18 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
     animation: shimmer 2s infinite;
 }
 
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 .progress-details {
@@ -194,7 +218,8 @@ body {
 }
 
 .materia.cursando {
-    background-color: #ffe4e1; /* Rosa claro */
+    background-color: #ffe4e1;
+    /* Rosa claro */
     color: #a5374e;
     border: none;
     text-decoration: none;
@@ -207,6 +232,13 @@ body {
     text-decoration-thickness: 2px;
     border: none !important;
     box-shadow: none;
+}
+
+.materia.habilitada {
+    background-color: #ffc0cb !important;
+    color: #a5374e !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
 }
 
 
@@ -281,16 +313,16 @@ body {
     .celebration-modal .modal-title {
         font-size: 2rem;
     }
-    
+
     .celebration-text {
         font-size: 1.1rem;
     }
-    
+
     .celebration-icon {
         font-size: 4rem;
         margin: 15px 0;
     }
-    
+
     .celebration-modal .modal-body {
         padding: 20px;
     }
@@ -300,6 +332,7 @@ body {
     from {
         transform: translateY(0);
     }
+
     to {
         transform: translateY(-15px);
     }
@@ -329,7 +362,7 @@ body {
     font-weight: bold;
     text-align: center;
     z-index: 9999;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     transition: all 0.5s ease-in-out;
     max-width: 400px;
 }

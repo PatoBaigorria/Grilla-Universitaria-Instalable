@@ -1,696 +1,864 @@
-document.addEventListener('DOMContentLoaded', function () {
-    // Objeto para almacenar el estado de las materias
+// Función que se ejecuta cuando el DOM está listo, incluso si se carga dinámicamente
+(function() {
+    // Si el DOM ya está listo, ejecutar inmediatamente
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', iniciarApp);
+    } else {
+        // DOM ya está listo, ejecutar inmediatamente
+        iniciarApp();
+    }
+    
+    function iniciarApp() {
+    // Configuración
     let estadosMaterias = {};
+    const SHEETDB_URL = 'https://sheetdb.io/api/v1/zw9kz4mn56mi2';
     
     // Historial para la función deshacer (hasta 20 movimientos)
     const historialEstados = [];
     const maxHistorial = 20;
+
+    // ========== COLORES ==========
+    // Los colores se manejarán completamente por CSS con clases
+
+    // ========== FUNCIONES DE SHEETDB ==========
     
-    // Definir colores para las materias (mover al inicio para evitar errores de referencia)
-    // Colores para las materias habilitadas (como las de primer año)
-    const colorFondoHabilitado = '#ffc0cb';
-    const colorTextoHabilitado = '#a5374e';
-    
-    // Colores para las materias cursando
-    const colorFondoCursando = '#ffe4e1';
-    const colorTextoCursando = '#a5374e';
-    
-    // Colores para las materias aprobadas
-    const colorFondoAprobada = '#ffe4e1';
-    const colorTextoAprobada = '#9e737b';
-    
-    // Función para establecer una cookie
-    function setCookie(name, value, days) {
-        let expires = "";
-        if (days) {
-            const date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
-        }
-        document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/";
-    }
-    
-    // Función para obtener una cookie
-    function getCookie(name) {
-        const nameEQ = name + "=";
-        const ca = document.cookie.split(';');
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i];
-            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
-        }
-        return null;
-    }
-    
-    // Función para cargar estados guardados
-    function cargarEstadosGuardados() {
+    // Cargar estados desde Google Sheets
+    async function cargarDesdeSheet() {
         try {
-            let estadosCargados = false;
+            console.log('Cargando datos desde Google Sheets...');
+            console.log('URL de la API:', SHEETDB_URL);
+            const res = await fetch(SHEETDB_URL);
+            console.log('Respuesta HTTP status:', res.status);
+            const rows = await res.json();
+            console.log('Datos RAW recibidos de Google Sheets:', rows);
+            console.log('Tipo de datos recibidos:', typeof rows);
+            console.log('Es un array?', Array.isArray(rows));
+            console.log('Longitud del array:', rows.length);
             
-            // Paso 1: Intentar cargar desde localStorage
-            try {
-                const estadosGuardadosLS = localStorage.getItem('estadosMaterias');
-                if (estadosGuardadosLS) {
-                    estadosMaterias = JSON.parse(estadosGuardadosLS);
-                    console.log('Estados cargados desde localStorage:', estadosMaterias);
-                    estadosCargados = true;
-                }
-            } catch (errorLS) {
-                console.warn('Error al cargar desde localStorage:', errorLS);
-            }
-            
-            // Paso 2: Si no se cargaron estados desde localStorage, verificar cookies
-            if (!estadosCargados) {
-                const cookieGuardada = getCookie('estadosMaterias_guardado');
-                if (cookieGuardada === 'true') {
-                    console.log('Se detectó que hay estados guardados en cookies, pero no se pudieron recuperar completamente.');
-                    // Aquí podríamos mostrar un mensaje al usuario para que use el botón de cargar
-                }
-            }
-            
-            // Aplicar los estados guardados a las materias
-            const todasLasMaterias = document.querySelectorAll('.materia');
-            todasLasMaterias.forEach(materia => {
-                const id = materia.id;
-                if (estadosMaterias[id]) {
-                    // Eliminar clases existentes
-                    materia.classList.remove('cursando', 'aprobada');
-                    
-                    // Aplicar clases según el estado guardado
-                    if (estadosMaterias[id].cursando) {
-                        materia.classList.add('cursando');
-                    } else if (estadosMaterias[id].aprobada) {
-                        materia.classList.add('aprobada');
-                    }
-                    
-                    // Aplicar estilos
-                    aplicarEstilos(materia);
-                }
-            });
-            
-            // Actualizar la barra de progreso
-            actualizarBarraProgreso();
-        } catch (error) {
-            console.error('Error al cargar los estados guardados:', error);
-            // Si hay un error, inicializar con un objeto vacío
+            // Limpiar estados actuales
             estadosMaterias = {};
-        }
-    }
-    
-    // Función para guardar estados
-    function guardarEstados() {
-        try {
-            // Actualizar el objeto de estados con los valores actuales
-            const todasLasMaterias = document.querySelectorAll('.materia');
-            todasLasMaterias.forEach(materia => {
-                const id = materia.id;
-                estadosMaterias[id] = {
-                    cursando: materia.classList.contains('cursando'),
-                    aprobada: materia.classList.contains('aprobada')
-                };
+            
+            // Buscar el marcador de reinicio más reciente
+            let ultimoReinicioIndex = -1;
+            rows.forEach((row, index) => {
+                if (row.id_materia === '_REINICIO_' && row.estado === 'reiniciado') {
+                    ultimoReinicioIndex = index;
+                    console.log(`Marcador de reinicio encontrado en fila ${index}:`, row);
+                }
             });
             
-            // Convertir a JSON
-            const estadosJSON = JSON.stringify(estadosMaterias);
+            // Si hay un marcador de reinicio, solo procesar filas posteriores a él
+            const startIndex = ultimoReinicioIndex >= 0 ? ultimoReinicioIndex + 1 : 0;
+            console.log(`Procesando desde fila ${startIndex} (${ultimoReinicioIndex >= 0 ? 'después del último reinicio' : 'desde el inicio'})`);
             
-            // Guardar en localStorage
-            localStorage.setItem('estadosMaterias', estadosJSON);
-            
-            // Guardar en cookies como respaldo (fragmentado si es necesario)
-            try {
-                // Las cookies tienen un límite de tamaño, así que guardamos solo un indicador
-                setCookie('estadosMaterias_guardado', 'true', 365);
-                // Y la fecha de la última actualización
-                setCookie('estadosMaterias_timestamp', new Date().toISOString(), 365);
-            } catch (cookieError) {
-                console.warn('No se pudo guardar en cookies:', cookieError);
+            // Procesar cada fila de la hoja (solo las posteriores al último reinicio)
+            for (let i = startIndex; i < rows.length; i++) {
+                const row = rows[i];
+                console.log(`Fila ${i}:`, row);
+                
+                if (row.id_materia && row.estado && row.id_materia !== '_REINICIO_') {
+                    // Sobrescribir el estado anterior (el último en el array será el final)
+                    estadosMaterias[row.id_materia] = {
+                        cursando: row.estado === 'cursando',
+                        aprobada: row.estado === 'aprobada'
+                    };
+                    console.log(`Procesando ${row.id_materia}: ${row.estado}`);
+                }
             }
             
-            console.log('Estados guardados en localStorage y cookies:', estadosMaterias);
+            console.log('Procesamiento completado. Estados finales:', estadosMaterias);
+            
+            console.log('Estados cargados desde Sheet:', estadosMaterias);
+            console.log('Número de materias cargadas:', Object.keys(estadosMaterias).length);
+            
+            // Mostrar cada materia cargada individualmente
+            Object.entries(estadosMaterias).forEach(([id, estado]) => {
+                console.log(`Materia ${id}:`, estado);
+            });
+            
+            // NO aplicar estados aquí - se hará en el orden correcto desde inicializar()
+            console.log('Estados cargados correctamente desde Google Sheets');
             
             return true;
         } catch (error) {
-            console.error('Error al guardar los estados:', error);
+            console.error('Error al cargar desde Google Sheets:', error);
+            mostrarMensajeFlash('Error al cargar datos desde Google Sheets', 'error');
             return false;
         }
     }
 
-    // Cargar estados guardados al iniciar
-    cargarEstadosGuardados();
+    // Guardar estados en Google Sheets
+    async function guardarEnSheet() {
+        try {
+            console.log('Guardando datos en Google Sheets...');
+            console.log('Estados actuales a guardar:', estadosMaterias);
+            
+            // Preparar datos para enviar (solo materias con estado)
+            const updates = [];
+            Object.entries(estadosMaterias).forEach(([id, estado]) => {
+                if (estado.cursando || estado.aprobada) {
+                    let estadoTexto = '';
+                    if (estado.aprobada) estadoTexto = 'aprobada';
+                    else if (estado.cursando) estadoTexto = 'cursando';
+                    
+                    updates.push({
+                        id_materia: id,
+                        nombre: document.getElementById(id)?.textContent || id,
+                        estado: estadoTexto
+                    });
+                }
+            });
 
-    const todasLasMaterias = document.querySelectorAll('.materia');
-    
-    // Inicializar el estado de las materias si no se cargaron del localStorage
-    if (Object.keys(estadosMaterias).length === 0) {
-        todasLasMaterias.forEach(materia => {
-            estadosMaterias[materia.id] = {
-                cursando: materia.classList.contains('cursando'),
-                aprobada: materia.classList.contains('aprobada')
-            };
-        });
+            console.log('Datos a enviar a Google Sheets:', updates);
+
+            // Nueva estrategia: Solo usar POST para agregar datos
+            // No intentamos limpiar la hoja, trabajamos con los datos existentes
+            if (updates.length > 0) {
+                console.log('Guardando datos con POST...');
+                const response = await fetch(SHEETDB_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error en POST:', errorText);
+                    throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const responseData = await response.json();
+                console.log('Respuesta de Google Sheets (POST):', responseData);
+            } else {
+                console.log('No hay datos para guardar - guardando marcador de reinicio...');
+                // Guardar un marcador especial que indique que el estado fue reiniciado
+                const reinicioMarker = [{
+                    id_materia: '_REINICIO_',
+                    nombre: 'Estado Reiniciado',
+                    estado: 'reiniciado',
+                    timestamp: new Date().toISOString()
+                }];
+                
+                const response = await fetch(SHEETDB_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reinicioMarker)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error al guardar marcador de reinicio:', errorText);
+                    throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+                }
+                
+                console.log('Marcador de reinicio guardado exitosamente');
+            }
+            
+            console.log('Datos guardados exitosamente en Google Sheets');
+            mostrarMensajeFlash('Progreso guardado en Google Sheets', 'success');
+            return true;
+        } catch (error) {
+            console.error('Error al guardar en Google Sheets:', error);
+            mostrarMensajeFlash('Error al guardar en Google Sheets: ' + error.message, 'error');
+            return false;
+        }
     }
 
-    // Función para aplicar estilos según el estado de la materia
+    // Función para reiniciar todas las materias
+    async function reiniciarMaterias() {
+        try {
+            console.log('Reiniciando todas las materias...');
+            
+            // Limpiar estados locales
+            estadosMaterias = {};
+            
+            // NOTA: No limpiamos Google Sheets porque SheetDB no lo permite
+            // Los datos antiguos quedarán en la hoja, pero el estado local se reinicia
+            // La próxima vez que se guarde, se agregarán solo los nuevos datos
+            console.log('Estados locales reiniciados (Google Sheets no se modifica)');
+            
+            // Aplicar cambios al DOM
+            const todasLasMaterias = document.querySelectorAll('.materia');
+            todasLasMaterias.forEach(materia => {
+                materia.classList.remove('cursando', 'aprobada');
+                aplicarEstilos(materia);
+            });
+            
+            // Revisar correlatividades y actualizar progreso
+            revisarCorrelativas();
+            actualizarBarraProgreso();
+            
+            // Limpiar historial y actualizar botón
+            historialEstados.length = 0;
+            actualizarBotonDeshacer();
+            
+            console.log('Materias reiniciadas exitosamente');
+            mostrarMensajeFlash('Todas las materias han sido reiniciadas', 'success');
+            return true;
+        } catch (error) {
+            console.error('Error al reiniciar materias:', error);
+            mostrarMensajeFlash('Error al reiniciar materias: ' + error.message, 'error');
+            return false;
+        }
+    }
+
+    // ========== FUNCIONES DE INTERFAZ ==========
+    
+    // Aplicar estados cargados al DOM
+    function aplicarEstadosAlDOM() {
+        console.log('=== APLICANDO ESTADOS AL DOM ===');
+        console.log('Estados disponibles:', estadosMaterias);
+        
+        const todasLasMaterias = document.querySelectorAll('.materia');
+        console.log('Materias encontradas en DOM:', todasLasMaterias.length);
+        
+        todasLasMaterias.forEach(materia => {
+            const id = materia.id;
+            console.log(`Procesando materia DOM: ${id}`);
+            
+            // Limpiar clases existentes
+            materia.classList.remove('cursando', 'aprobada');
+            
+            // Aplicar estado guardado
+            if (estadosMaterias[id]) {
+                console.log(`Estado encontrado para ${id}:`, estadosMaterias[id]);
+                if (estadosMaterias[id].cursando) {
+                    console.log(`Aplicando clase 'cursando' a ${id}`);
+                    materia.classList.add('cursando');
+                } else if (estadosMaterias[id].aprobada) {
+                    console.log(`Aplicando clase 'aprobada' a ${id}`);
+                    materia.classList.add('aprobada');
+                } else {
+                    console.log(`${id} no tiene estado activo (cursando=false, aprobada=false)`);
+                }
+            } else {
+                console.log(`No hay estado guardado para ${id} - debería quedar con color rosa fuerte`);
+                // DEBUG: Verificar qué clases tiene después de limpiar
+                console.log(`${id} clases después de limpiar:`, Array.from(materia.classList));
+            }
+            
+            // Aplicar estilos visuales
+            aplicarEstilos(materia);
+            console.log(`Clases finales de ${id}:`, Array.from(materia.classList));
+        });
+        
+        console.log('=== FIN APLICACIÓN ESTADOS ===');
+        
+        // Actualizar correlatividades y progreso
+        revisarCorrelativas();
+        actualizarBarraProgreso();
+    }
+
+    // Aplicar estilos - SOLO limpiar estilos inline, el CSS maneja todo
     function aplicarEstilos(materia) {
-        // Limpiar estilos anteriores
+        console.log(`Aplicando estilos a ${materia.id}, clases:`, Array.from(materia.classList));
+        
+        // Limpiar TODOS los estilos inline para que el CSS tome control completo
         materia.style.backgroundColor = '';
         materia.style.color = '';
         materia.style.textDecoration = '';
         materia.style.textDecorationThickness = '';
+        materia.style.opacity = '';
+        materia.style.cursor = '';
+        materia.style.border = '';
+        materia.style.boxShadow = '';
         
-        // Aplicar estilos según el estado
-        if (materia.classList.contains('bloqueada')) {
-            // Aplicar estilo gris para materias bloqueadas
-            materia.style.backgroundColor = '#e0e0e0';
-            materia.style.color = '#555555';
-            return;
-        } else if (materia.classList.contains('cursando')) {
-            // Estilo para materias cursando
-            materia.style.backgroundColor = colorFondoCursando;
-            materia.style.color = colorTextoCursando;
-        } else if (materia.classList.contains('aprobada')) {
-            // Estilo para materias aprobadas
-            materia.style.backgroundColor = colorFondoAprobada;
-            materia.style.color = colorTextoAprobada;
-            materia.style.textDecoration = 'line-through';
-            materia.style.textDecorationThickness = '2px';
-        } else {
-            // Estilo para materias habilitadas (no cursando ni aprobadas)
-            materia.style.backgroundColor = colorFondoHabilitado;
-            materia.style.color = colorTextoHabilitado;
-        }
+        // El CSS maneja todos los colores y cursores según las clases
+        console.log(`${materia.id}: Estilos limpiados - CSS maneja todo según clases`);
+        console.log(`${materia.id}: Clases finales:`, Array.from(materia.classList));
     }
 
-    // Función para inicializar las materias
+    // Inicializar estilos de todas las materias
     function inicializarMaterias() {
-        // Primero, marcar todas las materias como bloqueadas excepto las del primer año primer cuatrimestre
+        const todasLasMaterias = document.querySelectorAll('.materia');
         todasLasMaterias.forEach(materia => {
-            // Verificar si es materia del primer año primer cuatrimestre
-            const esPrimerAnioPrimerCuatrimestre = [
-                'algebra-1',
-                'calculo-1',
-                'matematica-computacion-1',
-                'ingles',
-                'seminario',
-                'ingles-2'
-            ].includes(materia.id);
+            // Limpiar estilos inline para que el CSS tome control
+            materia.style.backgroundColor = '';
+            materia.style.color = '';
+            materia.style.textDecoration = '';
+            materia.style.opacity = '';
+            materia.style.cursor = '';
+            materia.style.border = '';
+            materia.style.boxShadow = '';
             
-            // Si no es del primer año primer cuatrimestre y no tiene estado guardado, marcarla como bloqueada
-            if (!esPrimerAnioPrimerCuatrimestre && 
-                !(estadosMaterias[materia.id] && 
-                  (estadosMaterias[materia.id].cursando || estadosMaterias[materia.id].aprobada))) {
-                
-                // No bloquear si ya tiene la clase bloqueada (como matemática discreta y álgebra 2)
-                if (!materia.classList.contains('bloqueada')) {
-                    materia.classList.add('bloqueada');
+            // Solo aplicar cursor específico según estado
+            if (materia.classList.contains('bloqueada')) {
+                materia.style.cursor = 'not-allowed';
+            } else {
+                materia.style.cursor = 'pointer';
+            }
+        });
+    }
+
+    // NOTA: Las funciones configurarEventListeners, guardarEnHistorial y revisarCorrelativas
+    // están implementadas más abajo en la sección correcta del código
+
+    // ========== BARRA DE PROGRESO ==========
+    
+    function actualizarBarraProgreso() {
+        console.log('=== ACTUALIZANDO BARRA DE PROGRESO ===');
+        const todasLasMaterias = document.querySelectorAll('.materia');
+        
+        // Definir materias anuales que aparecen duplicadas
+        const materiasAnuales = {
+            'ingles': ['ingles', 'ingles-2']  // Inglés aparece como 'ingles' e 'ingles-2'
+        };
+        
+        let materiasAprobadas = 0;
+        let materiasCursando = 0;
+        let materiasContadas = new Set(); // Para evitar contar duplicados
+        
+        // Calcular total real de materias (descontando duplicados anuales)
+        let totalMateriasReales = todasLasMaterias.length;
+        Object.values(materiasAnuales).forEach(grupo => {
+            totalMateriasReales -= (grupo.length - 1); // Restar duplicados
+        });
+
+        console.log(`Total de materias en DOM: ${todasLasMaterias.length}`);
+        console.log(`Total de materias reales (sin duplicados anuales): ${totalMateriasReales}`);
+        console.log('Estados actuales:', estadosMaterias);
+
+        todasLasMaterias.forEach(materia => {
+            const id = materia.id;
+            console.log(`Revisando materia ${id}:`, estadosMaterias[id]);
+            
+            // Verificar si es una materia anual
+            let esAnual = false;
+            let grupoAnual = null;
+            let nombreMateria = null;
+            
+            for (const [nombre, ids] of Object.entries(materiasAnuales)) {
+                if (ids.includes(id)) {
+                    esAnual = true;
+                    grupoAnual = ids;
+                    nombreMateria = nombre;
+                    break;
                 }
             }
             
-            // Aplicar estilos según el estado
-            aplicarEstilos(materia);
-        });
-    }
-    
-    // Aplicar estilos iniciales a todas las materias
-    inicializarMaterias();
-
-    // Función para guardar el estado actual en el historial
-    function guardarEnHistorial() {
-        // Crear una copia profunda del estado actual
-        const estadoActual = JSON.parse(JSON.stringify(estadosMaterias));
-        
-        // Añadir al historial
-        historialEstados.push(estadoActual);
-        
-        // Limitar el tamaño del historial
-        if (historialEstados.length > maxHistorial) {
-            historialEstados.shift(); // Eliminar el estado más antiguo
-        }
-        
-        // Habilitar el botón de deshacer
-        document.getElementById('deshacerBtn').disabled = false;
-    }
-    
-    todasLasMaterias.forEach(materia => {
-        materia.addEventListener('click', function () {
-            // Verificar si la materia está bloqueada
-            if (this.classList.contains('bloqueada')) {
-                // No permitir cambios de estado en materias bloqueadas
-                return;
-            }
-
-            const estaAprobada = this.classList.contains('aprobada');
-            const estaCursando = this.classList.contains('cursando');
-            
-            // Guardar el estado actual en el historial antes de modificarlo
-            guardarEnHistorial();
-
-            if (!estaCursando && !estaAprobada) {
-                this.classList.add('cursando');
-                // Actualizar el estado guardado
-                estadosMaterias[this.id] = { cursando: true, aprobada: false };
-                // Ya no guardamos automáticamente
-                // guardarEstados();
-            } else if (estaCursando) {
-                this.classList.remove('cursando');
-                this.classList.add('aprobada');
-                // Actualizar el estado guardado
-                estadosMaterias[this.id] = { cursando: false, aprobada: true };
-                // Ya no guardamos automáticamente
-                // guardarEstados();
-            } else if (estaAprobada) {
-                this.classList.remove('aprobada');
-                // Actualizar el estado guardado
-                estadosMaterias[this.id] = { cursando: false, aprobada: false };
-                // Ya no guardamos automáticamente
-                // guardarEstados();
-            }
-            
-            // Aplicar estilos según el nuevo estado
-            aplicarEstilos(this);
-
-            revisarCorrelativas();
-            
-            // Actualizar la barra de progreso después de cambiar el estado
-            setTimeout(actualizarBarraProgreso, 100);
-        });
-    });
-
-    function revisarCorrelativas() {
-        const materias = document.querySelectorAll('.materia');
-        
-        // Restaurar estados guardados primero
-        for (const id in estadosMaterias) {
-            const materia = document.getElementById(id);
-            if (!materia) continue;
-            
-            // Si la materia estaba cursando o aprobada, restauramos ese estado
-            if (estadosMaterias[id].cursando) {
-                materia.classList.remove('bloqueada');
-                materia.classList.add('cursando');
-                materia.classList.remove('aprobada');
-                aplicarEstilos(materia);
-            } else if (estadosMaterias[id].aprobada) {
-                materia.classList.remove('bloqueada');
-                materia.classList.remove('cursando');
-                materia.classList.add('aprobada');
-                aplicarEstilos(materia);
-            }
-        }
-        
-        // Caso especial para Cálculo 2
-        const algebra1 = document.getElementById('algebra-1');
-        const calculo1 = document.getElementById('calculo-1');
-        const calculo2 = document.getElementById('calculo-2');
-        
-        if (calculo2 && algebra1 && calculo1) {
-            // Si ya está cursando o aprobada, no la bloqueamos
-            if (estadosMaterias[calculo2.id] && (estadosMaterias[calculo2.id].cursando || estadosMaterias[calculo2.id].aprobada)) {
-                // No hacer nada, mantener el estado actual
+            if (esAnual) {
+                // Para materias anuales, verificar si ya fue contada
+                if (!materiasContadas.has(nombreMateria)) {
+                    console.log(`${id}: Es materia anual (${nombreMateria}), verificando grupo completo:`, grupoAnual);
+                    
+                    // Verificar estado de todas las partes de la materia anual
+                    const todasAprobadas = grupoAnual.every(idParte => 
+                        estadosMaterias[idParte] && estadosMaterias[idParte].aprobada
+                    );
+                    
+                    const algunaCursando = grupoAnual.some(idParte => 
+                        estadosMaterias[idParte] && estadosMaterias[idParte].cursando
+                    );
+                    
+                    if (todasAprobadas) {
+                        materiasAprobadas++;
+                        console.log(`${nombreMateria}: ANUAL APROBADA (todas las partes aprobadas) - total: ${materiasAprobadas}`);
+                    } else if (algunaCursando) {
+                        materiasCursando++;
+                        console.log(`${nombreMateria}: ANUAL CURSANDO (alguna parte cursando) - total: ${materiasCursando}`);
+                    } else {
+                        console.log(`${nombreMateria}: ANUAL sin estado activo`);
+                    }
+                    
+                    materiasContadas.add(nombreMateria);
+                } else {
+                    console.log(`${id}: Parte de materia anual ya contada (${nombreMateria})`);
+                }
             } else {
-                // Verificar si ambas materias están cursando o aprobadas
-                const algebra1Habilitante = algebra1.classList.contains('cursando') || algebra1.classList.contains('aprobada');
-                const calculo1Habilitante = calculo1.classList.contains('cursando') || calculo1.classList.contains('aprobada');
-                
-                if (algebra1Habilitante && calculo1Habilitante) {
-                    // Habilitar Cálculo 2
-                    const estabaBloqueada = calculo2.classList.contains('bloqueada');
-                    calculo2.classList.remove('bloqueada');
-                    
-                    // Aplicar estilos
-                    aplicarEstilos(calculo2);
-                    
-                    // Añadir un efecto visual si recién se habilitó
-                    if (estabaBloqueada) {
-                        calculo2.style.transition = 'all 0.5s';
-                        calculo2.style.boxShadow = '0 0 10px rgba(165, 55, 78, 0.7)';
-                        setTimeout(() => {
-                            calculo2.style.boxShadow = '';
-                        }, 1000);
+                // Para materias normales (no anuales)
+                if (estadosMaterias[id]) {
+                    if (estadosMaterias[id].aprobada) {
+                        materiasAprobadas++;
+                        console.log(`${id}: APROBADA (total aprobadas: ${materiasAprobadas})`);
+                    } else if (estadosMaterias[id].cursando) {
+                        materiasCursando++;
+                        console.log(`${id}: CURSANDO (total cursando: ${materiasCursando})`);
+                    } else {
+                        console.log(`${id}: Sin estado activo (cursando=false, aprobada=false)`);
                     }
                 } else {
-                    calculo2.classList.add('bloqueada');
+                    console.log(`${id}: No tiene estado guardado`);
                 }
             }
+        });
+        
+        // Usar el total real de materias para los cálculos
+        const totalMaterias = totalMateriasReales;
+
+        const porcentajeAprobadas = (materiasAprobadas / totalMaterias) * 100;
+        const porcentajeCursando = (materiasCursando / totalMaterias) * 100;
+
+        console.log(`RESULTADO: ${materiasAprobadas} aprobadas, ${materiasCursando} cursando de ${totalMaterias} materias`);
+        console.log(`PORCENTAJES: ${porcentajeAprobadas.toFixed(1)}% aprobadas, ${porcentajeCursando.toFixed(1)}% cursando`);
+
+        // Actualizar barra de progreso existente (solo materias aprobadas)
+        const barraInterna = document.querySelector('.progress-bar-inner');
+        const porcentajeElemento = document.querySelector('.progress-percentage');
+        const materiasAprobadasElemento = document.querySelector('.materias-aprobadas');
+        const totalMateriasElemento = document.querySelector('.total-materias');
+
+        // Solo contar materias aprobadas para el porcentaje principal
+        const porcentajePrincipal = (materiasAprobadas / totalMaterias) * 100;
+
+        if (barraInterna) {
+            barraInterna.style.width = porcentajePrincipal + '%';
+            console.log(`Barra principal actualizada a: ${porcentajePrincipal.toFixed(1)}%`);
+        } else {
+            console.log('Elemento .progress-bar-inner no encontrado');
         }
+        
+        if (porcentajeElemento) {
+            porcentajeElemento.textContent = porcentajePrincipal.toFixed(0) + '%';
+            console.log(`Porcentaje principal actualizado: ${porcentajePrincipal.toFixed(0)}%`);
+        } else {
+            console.log('Elemento .progress-percentage no encontrado');
+        }
+        
+        if (materiasAprobadasElemento) {
+            materiasAprobadasElemento.textContent = materiasAprobadas;
+            console.log(`Materias aprobadas actualizado: ${materiasAprobadas}`);
+        } else {
+            console.log('Elemento .materias-aprobadas no encontrado');
+        }
+        
+        if (totalMateriasElemento) {
+            totalMateriasElemento.textContent = totalMaterias;
+            console.log(`Total materias actualizado: ${totalMaterias}`);
+        } else {
+            console.log('Elemento .total-materias no encontrado');
+        }
+        
+        console.log('=== FIN ACTUALIZACIÓN BARRA DE PROGRESO ===');
+    }
 
-        // Procesar todas las materias con correlatividades
+    // ========== SISTEMA DE CORRELATIVIDADES ==========
+    
+    // Revisar y actualizar el estado de las correlatividades
+    function revisarCorrelativas() {
+        console.log('=== INICIANDO REVISIÓN CORRELATIVIDADES ===');
+        console.log('Estados actuales en estadosMaterias:', estadosMaterias);
+        
+        const materias = document.querySelectorAll('.materia');
+        console.log(`Total de materias encontradas: ${materias.length}`);
+        
         materias.forEach(materia => {
-            // Si ya está cursando o aprobada, no la bloqueamos
-            if (estadosMaterias[materia.id] && (estadosMaterias[materia.id].cursando || estadosMaterias[materia.id].aprobada)) {
+            const id = materia.id;
+            const correlativasData = materia.getAttribute('data-correlativas');
+            
+            console.log(`\n--- PROCESANDO MATERIA: ${id} ---`);
+            console.log(`${id}: Clases actuales:`, Array.from(materia.classList));
+            console.log(`${id}: Correlatividades:`, correlativasData);
+            
+            // Si no tiene correlatividades, no hacer nada
+            if (!correlativasData) {
+                console.log(`${id}: Sin correlatividades - SALTANDO`);
                 return;
             }
             
-            const requisitosStr = materia.getAttribute('data-correlativas');
-            
-            // Si no tiene correlatividades definidas y no es del primer año primer cuatrimestre,
-            // mantenerla bloqueada (esto afecta a las materias optativas)
-            if (!requisitosStr) {
-                // Verificar si es materia del primer año primer cuatrimestre
-                const esPrimerAnioPrimerCuatrimestre = [
-                    'algebra-1',
-                    'calculo-1',
-                    'matematica-computacion-1',
-                    'ingles',
-                    'seminario',
-                    'ingles-2'
-                ].includes(materia.id);
-                
-                // Si no es del primer año primer cuatrimestre, mantenerla bloqueada
-                if (!esPrimerAnioPrimerCuatrimestre) {
-                    materia.classList.add('bloqueada');
-                    aplicarEstilos(materia);
-                }
-                return;
-            }
-
-            let requisitos;
             try {
-                requisitos = JSON.parse(requisitosStr);
-            } catch (e) {
-                console.error(`Error al parsear requisitos de ${materia.id}`, e);
-                return;
-            }
-
-            // Agrupar por materia base
-            const grupos = {};
-            requisitos.forEach(req => {
-                if (!grupos[req.id]) grupos[req.id] = [];
-                grupos[req.id].push(req.estado);
-            });
-
-            const cumpleTodos = Object.entries(grupos).every(([id, estados]) => {
-                const materiaRequerida = document.getElementById(id);
-                return materiaRequerida && estados.some(estado => materiaRequerida.classList.contains(estado));
-            });
-
-            const estabaBloqueada = materia.classList.contains('bloqueada');
-            
-            if (cumpleTodos) {
-                materia.classList.remove('bloqueada');
-                // Aplicar estilos si la materia acaba de desbloquearse
-                // Aplicar estilos según el nuevo estado
+                const correlativas = JSON.parse(correlativasData);
+                let puedeHabilitarse = true;
+                let razonBloqueo = [];
+                
+                // Verificar cada correlativa
+                for (const correlativa of correlativas) {
+                    const idCorrelativa = correlativa.id;
+                    const estadoRequerido = correlativa.estado; // "cursando" o "aprobada"
+                    
+                    const estadoActual = estadosMaterias[idCorrelativa];
+                    
+                    if (!estadoActual) {
+                        // La correlativa no está ni cursando ni aprobada
+                        puedeHabilitarse = false;
+                        razonBloqueo.push(`${idCorrelativa}: necesita estar ${estadoRequerido}`);
+                        continue;
+                    }
+                    
+                    // Verificar si cumple el estado requerido
+                    if (estadoRequerido === 'cursando') {
+                        // Para "cursando", acepta tanto cursando como aprobada
+                        if (!estadoActual.cursando && !estadoActual.aprobada) {
+                            puedeHabilitarse = false;
+                            razonBloqueo.push(`${idCorrelativa}: debe estar cursando o aprobada`);
+                        }
+                    } else if (estadoRequerido === 'aprobada') {
+                        // Para "aprobada", solo acepta aprobada
+                        if (!estadoActual.aprobada) {
+                            puedeHabilitarse = false;
+                            razonBloqueo.push(`${idCorrelativa}: debe estar aprobada`);
+                        }
+                    }
+                }
+                
+                // Aplicar el resultado - Solo clases CSS
+                if (puedeHabilitarse) {
+                    // MATERIA HABILITADA
+                    materia.classList.remove('bloqueada');
+                    
+                    // LIMPIEZA AGRESIVA: Si la materia no tiene un estado guardado específico,
+                    // limpiar TODAS las clases excepto las básicas para que muestre rosa fuerte
+                    console.log(`\n=== PROCESANDO MATERIA HABILITADA: ${id} ===`);
+                    console.log(`${id}: Clases ANTES de limpiar:`, Array.from(materia.classList));
+                    console.log(`${id}: Estado en estadosMaterias:`, estadosMaterias[id]);
+                    
+                    if (!estadosMaterias[id] || (!estadosMaterias[id].cursando && !estadosMaterias[id].aprobada)) {
+                        // Remover cualquier clase de estado
+                        console.log(`${id}: REMOVIENDO clases cursando y aprobada...`);
+                        materia.classList.remove('cursando', 'aprobada');
+                        
+                        // DEBUG: Verificar clases después de limpiar
+                        console.log(`${id}: Clases DESPUÉS de limpiar:`, Array.from(materia.classList));
+                        
+                        // Verificar color computado
+                        const computedStyle = window.getComputedStyle(materia);
+                        console.log(`${id}: Color de fondo computado:`, computedStyle.backgroundColor);
+                        console.log(`${id}: Color de texto computado:`, computedStyle.color);
+                        
+                        console.log(`${id}: *** DEBERÍA MOSTRAR ROSA FUERTE ***`);
+                    } else {
+                        console.log(`${id}: MANTIENE estado guardado:`, estadosMaterias[id]);
+                    }
+                    console.log(`=== FIN PROCESAMIENTO ${id} ===\n`);
+                    
+                    console.log(`${id}: Correlativas cumplidas - HABILITADA`);
+                } else {
+                    // MATERIA BLOQUEADA
+                    materia.classList.add('bloqueada');
+                    console.log(`${id}: Correlativas NO cumplidas - BLOQUEADA`);
+                    console.log(`  Razones: ${razonBloqueo.join(', ')}`);
+                }
+                
+                // Aplicar estilos después de cambiar las clases
                 aplicarEstilos(materia);
                 
-                // Efecto visual para destacar que se ha habilitado
-                if (estabaBloqueada) {
-                    materia.style.transition = 'all 0.5s';
-                    materia.style.boxShadow = '0 0 10px rgba(165, 55, 78, 0.7)';
-                    setTimeout(() => {
-                        materia.style.boxShadow = '';
-                    }, 1000);
-                }
-            } else {
+            } catch (error) {
+                console.error(`Error al procesar correlativas de ${id}:`, error);
+                // En caso de error, mantener bloqueada por seguridad
                 materia.classList.add('bloqueada');
                 aplicarEstilos(materia);
             }
         });
-    }
-
-    // Función para mezclar dos colores hex con un factor de mezcla
-    function mezclarColores(color1, color2, factor) {
-        // Convertir colores hex a RGB
-        const r1 = parseInt(color1.substring(1, 3), 16);
-        const g1 = parseInt(color1.substring(3, 5), 16);
-        const b1 = parseInt(color1.substring(5, 7), 16);
         
-        const r2 = parseInt(color2.substring(1, 3), 16);
-        const g2 = parseInt(color2.substring(3, 5), 16);
-        const b2 = parseInt(color2.substring(5, 7), 16);
+        console.log('=== FIN REVISIÓN CORRELATIVIDADES ===');
         
-        // Interpolar entre los dos colores
-        const r = Math.round(r1 + factor * (r2 - r1));
-        const g = Math.round(g1 + factor * (g2 - g1));
-        const b = Math.round(b1 + factor * (b2 - b1));
-        
-        // Convertir de nuevo a hex
-        return `#${(r).toString(16).padStart(2, '0')}${(g).toString(16).padStart(2, '0')}${(b).toString(16).padStart(2, '0')}`;
-    }
-    
-    // Función para actualizar la barra de progreso
-    function actualizarBarraProgreso() {
-        // Obtener todas las materias excepto la segunda instancia de Inglés
-        const todasLasMaterias = Array.from(document.querySelectorAll('.materia')).filter(materia => {
-            // Excluir la segunda instancia de Inglés (ingles-2) del conteo total
-            return materia.id !== 'ingles-2';
-        });
-        
-        // Contar materias aprobadas, excluyendo la segunda instancia de Inglés
-        const materiasAprobadas = Array.from(document.querySelectorAll('.materia.aprobada')).filter(materia => {
-            return materia.id !== 'ingles-2';
-        });
-        
-        const totalMaterias = todasLasMaterias.length;
-        const totalAprobadas = materiasAprobadas.length;
-        const porcentaje = totalMaterias > 0 ? Math.round((totalAprobadas / totalMaterias) * 100) : 0;
-        
-        // Actualizar elementos visuales
-        document.querySelector('.progress-percentage').textContent = `${porcentaje}%`;
-        document.querySelector('.progress-bar-inner').style.width = `${porcentaje}%`;
-        document.querySelector('.materias-aprobadas').textContent = totalAprobadas;
-        document.querySelector('.total-materias').textContent = totalMaterias;
-        
-        // Efecto visual cuando se actualiza el progreso
-        const barraProgreso = document.querySelector('.progress-bar-inner');
-        barraProgreso.style.transition = 'width 0.8s ease-in-out';
-        
-        // Verificar si se alcanzó el 100% para mostrar la celebración
-        if (porcentaje === 100) {
-            // Pequeño retraso para que se vea la barra completa primero
-            setTimeout(() => {
-                // Mostrar el modal de felicitaciones
-                const congratsModal = new bootstrap.Modal(document.getElementById('congratsModal'));
-                congratsModal.show();
-                
-                // Lanzar confeti
-                confetti.start();
-                
-                // Detener el confeti después de 8 segundos
-                setTimeout(() => {
-                    confetti.stop();
-                }, 8000);
-                
-                // Cuando se cierre el modal, detener el confeti
-                document.getElementById('congratsModal').addEventListener('hidden.bs.modal', function () {
-                    confetti.stop();
-                });
-            }, 600);  // Retraso para que se vea la animación de la barra primero
-        }
-        
-        // Cambiar color de la barra según el progreso - transición suave de rosa a amarillo a verde
-        let colorInicio, colorFin;
-        
-        if (porcentaje < 40) {
-            // Rosa (inicio)
-            const factor = porcentaje / 40;
-            colorInicio = '#a5374e';
-            colorFin = mezclarColores('#ff6b8b', '#ffb347', factor);
-        } else if (porcentaje < 75) {
-            // Rosa a amarillo (medio)
-            const factor = (porcentaje - 40) / 35;
-            colorInicio = mezclarColores('#a5374e', '#d4ac0d', factor);
-            colorFin = mezclarColores('#ffb347', '#ffda44', factor);
-        } else {
-            // Amarillo a verde (final - a partir del 75%)
-            const factor = (porcentaje - 75) / 25;
-            colorInicio = mezclarColores('#d4ac0d', '#2e7d32', factor);
-            colorFin = mezclarColores('#ffda44', '#66bb6a', factor);
-        }
-        
-        barraProgreso.style.background = `linear-gradient(90deg, ${colorInicio}, ${colorFin})`;
-        
-        // Actualizar también el color del texto del porcentaje para que coincida
-        document.querySelector('.progress-percentage').style.background = 
-            `linear-gradient(45deg, ${colorInicio}, ${colorFin})`;
-        document.querySelector('.progress-percentage').style.webkitBackgroundClip = 'text';
-        document.querySelector('.progress-percentage').style.backgroundClip = 'text';
-        document.querySelector('.progress-percentage').style.webkitTextFillColor = 'transparent';
-        
-        // Ya no guardamos automáticamente al actualizar la barra de progreso
-        // guardarEstados();
-    }
-
-    // Ejecutar revisión inicial de correlatividades
-    revisarCorrelativas();
-    
-    // Inicializar la barra de progreso
-    actualizarBarraProgreso();
-    
-    // Ya no guardamos el estado inicial automáticamente
-    // guardarEstados();
-    
-    // Configurar botón de guardado
-    document.getElementById('guardarBtn').addEventListener('click', function() {
-        try {
-            // Mostrar indicador de carga
-            this.disabled = true;
-            this.innerHTML = 'Guardando...';
-            
-            // Guardar estados
-            const resultado = guardarEstados();
-            
-            if (resultado) {
-                // Mostrar confirmación con mensaje flash
-                mostrarMensajeFlash('¡Progreso guardado correctamente!', 'success');
-                console.log('Guardado exitoso en localStorage y cookies');
-            } else {
-                mostrarMensajeFlash('Error al guardar el progreso', 'error');
+        // DEBUG: Mostrar clases finales de todas las materias habilitadas
+        console.log('=== DEBUG: CLASES FINALES DE MATERIAS ===');
+        const materiasParaDebug = document.querySelectorAll('.materia');
+        materiasParaDebug.forEach(materia => {
+            if (!materia.classList.contains('bloqueada')) {
+                console.log(`${materia.id}: clases = [${Array.from(materia.classList).join(', ')}]`);
             }
-        } catch (error) {
-            console.error('Error en el proceso de guardado:', error);
-            mostrarMensajeFlash('Error al guardar el progreso', 'error');
-        } finally {
-            // Restaurar el botón
-            this.disabled = false;
-            this.innerHTML = 'Guardar progreso';
-        }
-    });
+        });
+        console.log('=== FIN DEBUG ===');
+    }
     
-    // Función para deshacer el último cambio
+    // ========== SISTEMA DE HISTORIAL ==========
+    
+    // Guardar estado actual en historial antes de hacer cambios
+    function guardarEnHistorial() {
+        console.log('Guardando estado en historial...');
+        
+        // Crear una copia profunda del estado actual
+        const estadoActual = JSON.parse(JSON.stringify(estadosMaterias));
+        
+        // Agregar al historial
+        historialEstados.push(estadoActual);
+        
+        // Limitar el historial al máximo permitido
+        if (historialEstados.length > maxHistorial) {
+            historialEstados.shift(); // Remover el más antiguo
+        }
+        
+        console.log(`Estado guardado en historial. Total: ${historialEstados.length}/${maxHistorial}`);
+        
+        // Actualizar botón deshacer
+        actualizarBotonDeshacer();
+    }
+    
+    // Actualizar estado del botón deshacer
+    function actualizarBotonDeshacer() {
+        const deshacerBtn = document.getElementById('deshacerBtn');
+        if (deshacerBtn) {
+            if (historialEstados.length > 0) {
+                deshacerBtn.disabled = false;
+                deshacerBtn.textContent = `Deshacer (${historialEstados.length})`;
+            } else {
+                deshacerBtn.disabled = true;
+                deshacerBtn.textContent = 'Deshacer';
+            }
+        }
+    }
+    
+    // Función deshacer corregida
     function deshacer() {
-        // Verificar si hay estados en el historial
+        console.log('=== DESHACIENDO ACCIÓN ===');
+        
         if (historialEstados.length === 0) {
-            document.getElementById('deshacerBtn').disabled = true;
+            mostrarMensajeFlash('No hay acciones para deshacer', 'info');
             return;
         }
-        
-        // Obtener el último estado guardado
+
+        // Restaurar el último estado guardado
         const estadoAnterior = historialEstados.pop();
+        estadosMaterias = JSON.parse(JSON.stringify(estadoAnterior));
         
-        // Actualizar el estado actual
-        estadosMaterias = estadoAnterior;
+        console.log('Estado restaurado:', estadosMaterias);
+        console.log(`Estados restantes en historial: ${historialEstados.length}`);
+
+        // Aplicar el estado restaurado al DOM
+        aplicarEstadosAlDOM();
         
-        // Actualizar la interfaz
+        // Actualizar botón deshacer
+        actualizarBotonDeshacer();
+        
+        // NO guardar automáticamente en Google Sheets al deshacer
+        // El usuario debe usar "Guardar progreso" manualmente si quiere persistir
+        
+        mostrarMensajeFlash('Acción deshecha', 'success');
+        console.log('=== FIN DESHACER ===');
+    }
+    
+    // ========== CONFIGURAR CLICKS EN MATERIAS ==========
+    
+    // Configurar clicks en materias
+    function configurarEventListeners() {
+        console.log('Configurando event listeners para materias...');
+        const todasLasMaterias = document.querySelectorAll('.materia');
+        
         todasLasMaterias.forEach(materia => {
-            // Limpiar clases actuales
-            materia.classList.remove('cursando');
-            materia.classList.remove('aprobada');
-            
-            // Aplicar estado anterior
-            const estadoMateria = estadosMaterias[materia.id];
-            if (estadoMateria) {
-                if (estadoMateria.cursando) {
-                    materia.classList.add('cursando');
-                } else if (estadoMateria.aprobada) {
-                    materia.classList.add('aprobada');
+            materia.addEventListener('click', function () {
+                console.log(`Click en materia: ${this.id}`);
+                
+                // Verificar si la materia está bloqueada
+                if (this.classList.contains('bloqueada')) {
+                    // Para materias optativas: solo permitir click si tienen correlativas definidas
+                    if (this.id.includes('optativa')) {
+                        const correlativasData = this.getAttribute('data-correlativas');
+                        if (!correlativasData) {
+                            console.log(`${this.id} es optativa sin correlativas definidas, ignorando click`);
+                            mostrarMensajeFlash('Esta materia optativa aún no tiene correlativas definidas', 'info');
+                            return;
+                        }
+                        console.log(`${this.id} es optativa con correlativas, permitiendo click`);
+                    } else {
+                        // Para materias regulares: no permitir click si están bloqueadas
+                        console.log(`${this.id} está bloqueada por correlativas, ignorando click`);
+                        return;
+                    }
                 }
-            }
-            
-            // Aplicar estilos
-            aplicarEstilos(materia);
+
+                // Guardar estado actual en historial antes de hacer cambios
+                guardarEnHistorial();
+
+                const id = this.id;
+                
+                // Inicializar estado si no existe
+                if (!estadosMaterias[id]) {
+                    estadosMaterias[id] = { cursando: false, aprobada: false };
+                }
+
+                // Ciclo de estados: bloqueada/vacío -> cursando -> aprobada -> vacío
+                if (!estadosMaterias[id].cursando && !estadosMaterias[id].aprobada) {
+                    // Vacío o bloqueada -> cursando
+                    estadosMaterias[id].cursando = true;
+                    estadosMaterias[id].aprobada = false;
+                    this.classList.remove('bloqueada');
+                    this.classList.add('cursando');
+                    console.log(`${id}: Vacío/Bloqueada -> CURSANDO`);
+                } else if (estadosMaterias[id].cursando) {
+                    // Cursando -> aprobada
+                    estadosMaterias[id].cursando = false;
+                    estadosMaterias[id].aprobada = true;
+                    this.classList.remove('cursando');
+                    this.classList.add('aprobada');
+                    console.log(`${id}: Cursando -> APROBADA`);
+                } else if (estadosMaterias[id].aprobada) {
+                    // Aprobada -> vacío (o bloqueada si es optativa)
+                    estadosMaterias[id].cursando = false;
+                    estadosMaterias[id].aprobada = false;
+                    this.classList.remove('aprobada');
+                    
+                    // Si es optativa, volver a bloqueada; si no, a habilitada
+                    if (this.id.includes('optativa')) {
+                        this.classList.add('bloqueada');
+                        console.log(`${id}: Aprobada -> BLOQUEADA (optativa)`);
+                    } else {
+                        console.log(`${id}: Aprobada -> HABILITADA`);
+                    }
+                }
+
+                // Aplicar estilos
+                aplicarEstilos(this);
+                
+                // Revisar correlatividades y actualizar progreso
+                revisarCorrelativas();
+                actualizarBarraProgreso();
+                
+                // Nota: El guardado en Google Sheets es solo manual (botón "Guardar progreso")
+                console.log(`Estado final de ${id}:`, estadosMaterias[id]);
+            });
         });
         
-        // Revisar correlativas y actualizar estados
-        revisarCorrelativas();
-        
-        // Actualizar barra de progreso
-        actualizarBarraProgreso();
-        
-        // Ya no guardamos automáticamente
-        // guardarEstados();
-        
-        // Mostrar mensaje flash
-        mostrarMensajeFlash('Cambio deshecho correctamente', 'info');
-        
-        // Deshabilitar el botón si no hay más estados en el historial
-        if (historialEstados.length === 0) {
-            document.getElementById('deshacerBtn').disabled = true;
-        }
+        console.log(`Event listeners configurados para ${todasLasMaterias.length} materias`);
     }
+
+    // ========== MENSAJES FLASH ==========
     
-    // Ya no necesitamos el botón de cargar progreso
-    
-    // Configurar botón de deshacer
-    document.getElementById('deshacerBtn').addEventListener('click', function() {
-        deshacer();
-    });
-    
-    // Configurar botón de reinicio
-    document.getElementById('reiniciarBtn').addEventListener('click', function() {
-        // Mostrar el modal de confirmación en lugar del alert
-        const reinicioModal = new bootstrap.Modal(document.getElementById('reinicioModal'));
-        reinicioModal.show();
-    });
-    
-    // Configurar botón de confirmación dentro del modal
-    document.getElementById('confirmarReinicioBtn').addEventListener('click', function() {
-        try {
-            // Guardar en historial antes de reiniciar
-            guardarEnHistorial();
-            
-            // Ocultar el modal
-            const reinicioModal = bootstrap.Modal.getInstance(document.getElementById('reinicioModal'));
-            reinicioModal.hide();
-            
-            // Mostrar indicador de carga en el botón principal
-            const reiniciarBtn = document.getElementById('reiniciarBtn');
-            reiniciarBtn.disabled = true;
-            reiniciarBtn.innerHTML = 'Reiniciando...';
-            
-            // Reiniciar estados de materias
-            estadosMaterias = {};
-            
-            // Eliminar clases de todas las materias
-            todasLasMaterias.forEach(materia => {
-                materia.classList.remove('cursando');
-                materia.classList.remove('aprobada');
-            });
-            
-            // Reinicializar materias (esto aplicará las clases bloqueadas correctamente)
-            inicializarMaterias();
-            
-            // Revisar correlativas para actualizar estados
-            revisarCorrelativas();
-            
-            // Actualizar barra de progreso
-            actualizarBarraProgreso();
-            
-            // Ya no guardamos automáticamente
-            // guardarEstados();
-            
-            // Mostrar mensaje flash
-            mostrarMensajeFlash('¡Materias reiniciadas correctamente!', 'success');
-        } catch (error) {
-            console.error('Error en el proceso de reinicio:', error);
-            mostrarMensajeFlash('Error al reiniciar las materias', 'error');
-        } finally {
-            // Restaurar el botón principal
-            const reiniciarBtn = document.getElementById('reiniciarBtn');
-            reiniciarBtn.disabled = false;
-            reiniciarBtn.innerHTML = 'Reiniciar materias';
-        }
-    });
-    
-    // Función para mostrar mensajes flash temporales
     function mostrarMensajeFlash(mensaje, tipo = 'success', duracion = 3000) {
-        const flashContainer = document.getElementById('flashMessage');
+        // Crear elemento del mensaje
+        const mensajeDiv = document.createElement('div');
+        mensajeDiv.className = `mensaje-flash mensaje-${tipo}`;
+        mensajeDiv.textContent = mensaje;
         
-        // Limpiar cualquier mensaje anterior
-        flashContainer.textContent = '';
-        flashContainer.className = 'flash-message';
+        // Estilos
+        mensajeDiv.style.position = 'fixed';
+        mensajeDiv.style.top = '20px';
+        mensajeDiv.style.right = '20px';
+        mensajeDiv.style.padding = '10px 20px';
+        mensajeDiv.style.borderRadius = '5px';
+        mensajeDiv.style.zIndex = '1000';
+        mensajeDiv.style.fontWeight = 'bold';
         
-        // Agregar clase según el tipo de mensaje
-        flashContainer.classList.add(`flash-${tipo}`);
+        if (tipo === 'success') {
+            mensajeDiv.style.backgroundColor = '#d4edda';
+            mensajeDiv.style.color = '#155724';
+            mensajeDiv.style.border = '1px solid #c3e6cb';
+        } else if (tipo === 'error') {
+            mensajeDiv.style.backgroundColor = '#f8d7da';
+            mensajeDiv.style.color = '#721c24';
+            mensajeDiv.style.border = '1px solid #f5c6cb';
+        } else if (tipo === 'info') {
+            mensajeDiv.style.backgroundColor = '#d1ecf1';
+            mensajeDiv.style.color = '#0c5460';
+            mensajeDiv.style.border = '1px solid #bee5eb';
+        }
         
-        // Establecer el mensaje
-        flashContainer.textContent = mensaje;
+        // Agregar al DOM
+        document.body.appendChild(mensajeDiv);
         
-        // Mostrar el mensaje
-        flashContainer.style.display = 'block';
-        
-        // Efecto de aparición
+        // Remover después de la duración especificada
         setTimeout(() => {
-            flashContainer.style.opacity = '1';
-        }, 10);
-        
-        // Ocultar después de la duración especificada
-        setTimeout(() => {
-            flashContainer.style.opacity = '0';
-            
-            // Eliminar el elemento después de la transición
-            setTimeout(() => {
-                flashContainer.style.display = 'none';
-            }, 500);
+            if (mensajeDiv.parentNode) {
+                mensajeDiv.parentNode.removeChild(mensajeDiv);
+            }
         }, duracion);
     }
-});
+
+    // ========== INICIALIZACIÓN ==========
+    
+    async function inicializar() {
+        console.log('Inicializando aplicación...');
+        
+        // Inicializar estilos
+        inicializarMaterias();
+        
+        // Configurar event listeners
+        configurarEventListeners();
+        
+        // Cargar datos desde Google Sheets
+        const cargaExitosa = await cargarDesdeSheet();
+        
+        if (cargaExitosa) {
+            mostrarMensajeFlash('Datos cargados desde Google Sheets', 'success');
+        } else {
+            mostrarMensajeFlash('Iniciando con estado vacío', 'info');
+        }
+        
+        // ORDEN CORRECTO DE APLICACIÓN:
+        // 1. Aplicar estados guardados al DOM
+        aplicarEstadosAlDOM();
+        
+        // 2. Revisar correlatividades (esto limpiará clases incorrectas en materias habilitadas)
+        revisarCorrelativas();
+        
+        // 3. Actualizar barra de progreso
+        actualizarBarraProgreso();
+        
+        // Inicializar botón deshacer
+        actualizarBotonDeshacer();
+        
+        console.log('Aplicación inicializada correctamente');
+    }
+
+    // ========== CONFIGURAR BOTONES ==========
+    
+    // Botón de deshacer
+    const deshacerBtn = document.getElementById('deshacerBtn');
+    if (deshacerBtn) {
+        deshacerBtn.addEventListener('click', deshacer);
+    }
+
+    // Botón de guardar (manual)
+    const guardarBtn = document.getElementById('guardarBtn');
+    if (guardarBtn) {
+        guardarBtn.addEventListener('click', async function() {
+            this.disabled = true;
+            this.textContent = 'Guardando...';
+            
+            const exito = await guardarEnSheet();
+            
+            this.disabled = false;
+            this.textContent = 'Guardar progreso';
+            
+            if (exito) {
+                mostrarMensajeFlash('Progreso guardado exitosamente', 'success');
+            }
+        });
+    }
+
+    // Botón de cargar (manual)
+    const cargarBtn = document.getElementById('cargarBtn');
+    if (cargarBtn) {
+        cargarBtn.addEventListener('click', async function() {
+            this.disabled = true;
+            this.textContent = 'Cargando...';
+            
+            const exito = await cargarDesdeSheet();
+            
+            this.disabled = false;
+            this.textContent = 'Cargar progreso';
+            
+            if (exito) {
+                mostrarMensajeFlash('Progreso cargado exitosamente', 'success');
+            }
+        });
+    }
+
+    // Botón de reiniciar materias (abre modal de confirmación)
+    const reiniciarBtn = document.getElementById('reiniciarBtn');
+    if (reiniciarBtn) {
+        reiniciarBtn.addEventListener('click', function() {
+            // Mostrar modal de confirmación usando Bootstrap
+            const reinicioModal = new bootstrap.Modal(document.getElementById('reinicioModal'));
+            reinicioModal.show();
+        });
+    }
+
+    // Botón de confirmación de reinicio (en el modal)
+    const confirmarReinicioBtn = document.getElementById('confirmarReinicioBtn');
+    if (confirmarReinicioBtn) {
+        confirmarReinicioBtn.addEventListener('click', async function() {
+            this.disabled = true;
+            this.textContent = 'Reiniciando...';
+            
+            const exito = await reiniciarMaterias();
+            
+            this.disabled = false;
+            this.textContent = 'Reiniciar materias';
+            
+            // Cerrar modal
+            const reinicioModal = bootstrap.Modal.getInstance(document.getElementById('reinicioModal'));
+            if (reinicioModal) {
+                reinicioModal.hide();
+            }
+            
+            if (exito) {
+                mostrarMensajeFlash('Todas las materias han sido reiniciadas exitosamente', 'success');
+            }
+        });
+    }
+
+    // ========== INICIAR APLICACIÓN ==========
+    inicializar();
+    }
+})();
