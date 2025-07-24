@@ -248,10 +248,29 @@
         mainScript.src = `./script.js?v=${timestamp}`;
         document.head.appendChild(mainScript);
         
-        // Service Worker
+        // Service Worker con actualización forzada
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js')
-                .then(reg => console.log('✅ Service Worker registrado', reg))
+                .then(reg => {
+                    console.log('✅ Service Worker registrado', reg);
+                    
+                    // Forzar actualización si hay una nueva versión
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('🔄 Nueva versión del Service Worker disponible, actualizando...');
+                                // Forzar la activación del nuevo service worker
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                                // Recargar la página para usar la nueva versión
+                                window.location.reload();
+                            }
+                        });
+                    });
+                    
+                    // Verificar actualizaciones cada vez que se carga la página
+                    reg.update();
+                })
                 .catch(err => console.error('❌ Error al registrar el Service Worker', err));
         }
     </script>
