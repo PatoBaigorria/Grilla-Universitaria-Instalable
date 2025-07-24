@@ -1,4 +1,4 @@
-const CACHE_NAME = 'plan-estudios-v32';
+const CACHE_NAME = 'plan-estudios-v33';
 const urlsToCache = [
   './',
   './index.html',
@@ -17,6 +17,13 @@ self.addEventListener('install', event => {
   );
 });
 
+// Manejar mensaje skipWaiting para forzar activación
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
+});
+
 // Activa el SW y elimina viejos caches si hay
 self.addEventListener('activate', event => {
   event.waitUntil(
@@ -32,12 +39,12 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Intercepta requests con estrategia diferente para CSS/JS
+// Intercepta requests con estrategia diferente para archivos críticos
 self.addEventListener('fetch', event => {
   const url = event.request.url;
   
-  // Para CSS y JS: NETWORK FIRST (siempre intenta la red primero)
-  if (url.includes('.css') || url.includes('.js')) {
+  // Para HTML, CSS y JS: NETWORK FIRST (siempre intenta la red primero)
+  if (url.includes('.html') || url.includes('.css') || url.includes('.js') || url.endsWith('/')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
@@ -56,7 +63,7 @@ self.addEventListener('fetch', event => {
         })
     );
   } else {
-    // Para otros archivos: CACHE FIRST (estrategia original)
+    // Para otros archivos (imágenes, etc.): CACHE FIRST
     event.respondWith(
       caches.match(event.request).then(response => {
         return response || fetch(event.request);
