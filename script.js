@@ -705,42 +705,32 @@
     // ========== MENSAJES FLASH ==========
     
     function mostrarMensajeFlash(mensaje, tipo = 'success', duracion = 3000) {
-        // Crear elemento del mensaje
-        const mensajeDiv = document.createElement('div');
-        mensajeDiv.className = `mensaje-flash mensaje-${tipo}`;
-        mensajeDiv.textContent = mensaje;
-        
-        // Estilos
-        mensajeDiv.style.position = 'fixed';
-        mensajeDiv.style.top = '20px';
-        mensajeDiv.style.right = '20px';
-        mensajeDiv.style.padding = '10px 20px';
-        mensajeDiv.style.borderRadius = '5px';
-        mensajeDiv.style.zIndex = '1000';
-        mensajeDiv.style.fontWeight = 'bold';
-        
-        if (tipo === 'success') {
-            mensajeDiv.style.backgroundColor = '#d4edda';
-            mensajeDiv.style.color = '#155724';
-            mensajeDiv.style.border = '1px solid #c3e6cb';
-        } else if (tipo === 'error') {
-            mensajeDiv.style.backgroundColor = '#f8d7da';
-            mensajeDiv.style.color = '#721c24';
-            mensajeDiv.style.border = '1px solid #f5c6cb';
-        } else if (tipo === 'info') {
-            mensajeDiv.style.backgroundColor = '#d1ecf1';
-            mensajeDiv.style.color = '#0c5460';
-            mensajeDiv.style.border = '1px solid #bee5eb';
+        // Usar el elemento flashMessage existente en el HTML
+        const flashMessage = document.getElementById('flashMessage');
+        if (!flashMessage) {
+            console.error('Elemento #flashMessage no encontrado');
+            return;
         }
         
-        // Agregar al DOM
-        document.body.appendChild(mensajeDiv);
+        // Limpiar clases anteriores
+        flashMessage.className = 'flash-message';
         
-        // Remover después de la duración especificada
+        // Aplicar clase según el tipo
+        if (tipo === 'success') {
+            flashMessage.classList.add('flash-success');
+        } else if (tipo === 'error') {
+            flashMessage.classList.add('flash-error');
+        } else if (tipo === 'info') {
+            flashMessage.classList.add('flash-info');
+        }
+        
+        // Establecer el mensaje y mostrar
+        flashMessage.textContent = mensaje;
+        flashMessage.style.display = 'block';
+        
+        // Ocultar después de la duración especificada
         setTimeout(() => {
-            if (mensajeDiv.parentNode) {
-                mensajeDiv.parentNode.removeChild(mensajeDiv);
-            }
+            flashMessage.style.display = 'none';
         }, duracion);
     }
 
