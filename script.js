@@ -16,6 +16,9 @@
     // Historial para la función deshacer (hasta 20 movimientos)
     const historialEstados = [];
     const maxHistorial = 20;
+    
+    // Rastrear qué materias han sido guardadas en Google Sheets
+    let materiasEnGoogleSheets = new Set();
 
     // ========== COLORES ==========
     // Los colores se manejarán completamente por CSS con clases
@@ -32,6 +35,7 @@
             
             // Limpiar estados actuales
             estadosMaterias = {};
+            materiasEnGoogleSheets.clear(); // Limpiar el registro de materias en Google Sheets
             
             // Buscar el marcador de reinicio más reciente
             let ultimoReinicioIndex = -1;
@@ -57,6 +61,9 @@
                         cursando: row.estado === 'cursando',
                         aprobada: row.estado === 'aprobada'
                     };
+                    // Registrar que esta materia existe en Google Sheets
+                    materiasEnGoogleSheets.add(row.id_materia);
+                    console.log(`📝 Registrada ${row.id_materia} como existente en Google Sheets`);
                 }
             }
             
@@ -81,8 +88,9 @@
             
             // Separar materias en dos grupos: activas y a eliminar
             const updates = []; // Materias con estado activo (cursando/aprobada)
-            const toDelete = []; // Materias que volvieron al estado inicial
+            const toDelete = []; // Materias que volvieron al estado inicial o desaparecieron
             
+            // 1. Procesar materias que están en estadosMaterias
             Object.entries(estadosMaterias).forEach(([id, estado]) => {
                 if (estado.cursando || estado.aprobada) {
                     // Materia con estado activo - agregar/actualizar
@@ -97,9 +105,20 @@
                     });
                     console.log(`📝 ${id}: ${estadoTexto} (será guardado)`);
                 } else {
-                    // Materia en estado inicial - eliminar de Google Sheets
+                    // Materia en estado inicial - eliminar de Google Sheets si existía
+                    if (materiasEnGoogleSheets.has(id)) {
+                        toDelete.push(id);
+                        console.log(`🗑️ ${id}: estado inicial (será eliminado de Google Sheets)`);
+                    }
+                }
+            });
+            
+            // 2. Buscar materias que estaban en Google Sheets pero ya no están en estadosMaterias
+            // (esto puede pasar después de usar "Deshacer" y volver al estado original)
+            materiasEnGoogleSheets.forEach(id => {
+                if (!estadosMaterias.hasOwnProperty(id)) {
                     toDelete.push(id);
-                    console.log(`🗑️ ${id}: estado inicial (será eliminado de Google Sheets)`);
+                    console.log(`🗑️ ${id}: desapareció tras deshacer (será eliminado de Google Sheets)`);
                 }
             });
 
@@ -108,19 +127,68 @@
             // 1. Primero eliminar materias que volvieron al estado inicial
             if (toDelete.length > 0) {
                 console.log('🗑️ Eliminando materias en estado inicial...');
-                for (const id of toDelete) {
-                    try {
-                        const deleteResponse = await fetch(`${SHEETDB_URL}/id_materia/${id}`, {
-                            method: 'DELETE'
-                        });
-                        
-                        if (deleteResponse.ok) {
-                            console.log(`✅ ${id}: eliminado de Google Sheets`);
-                        } else {
-                            console.log(`⚠️ ${id}: no se pudo eliminar (posiblemente no existía)`);
+                
+                // Primero, obtener datos actuales de Google Sheets para verificar formato
+                try {
+                    const currentDataResponse = await fetch(SHEETDB_URL);
+                    const currentData = await currentDataResponse.json();
+                    console.log('📋 Datos actuales en Google Sheets:', currentData.slice(0, 2)); // Solo mostrar primeras 2 filas
+                    
+                    for (const id of toDelete) {
+                        try {
+                            // Buscar la fila exacta en los datos actuales
+                            const existingRow = currentData.find(row => row.id_materia === id);
+                            
+                            if (existingRow) {
+                                console.log(`🔍 Encontrada fila para ${id}:`, existingRow);
+                                
+                                // Intentar eliminar usando el formato estándar de SheetDB
+                                const deleteResponse = await fetch(`${SHEETDB_URL}/id_materia/${id}`, {
+                                    method: 'DELETE'
+                                });
+                                
+                                if (deleteResponse.ok) {
+                                    const deleteResult = await deleteResponse.json();
+                                    console.log(`✅ ${id}: eliminado de Google Sheets`, deleteResult);
+                                    materiasEnGoogleSheets.delete(id);
+                                } else {
+                                    const errorText = await deleteResponse.text();
+                                    console.log(`❌ ${id}: DELETE falló (${deleteResponse.status}):`, errorText);
+                                    
+                                    // Como alternativa, intentar con POST para sobrescribir con datos vacíos
+                                    console.log(`🔄 Intentando método alternativo para ${id}...`);
+                                    const overwriteResponse = await fetch(SHEETDB_URL, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify([{
+                                            id_materia: id,
+                                            nombre: '',
+                                            estado: '_ELIMINADO_'
+                                        }])
+                                    });
+                                    
+                                    if (overwriteResponse.ok) {
+                                        console.log(`✅ ${id}: marcado como eliminado usando método alternativo`);
+                                        materiasEnGoogleSheets.delete(id);
+                                    } else {
+                                        console.log(`❌ ${id}: método alternativo también falló`);
+                                        materiasEnGoogleSheets.delete(id); // Remover del tracking de todas formas
+                                    }
+                                }
+                            } else {
+                                console.log(`ℹ️ ${id}: no encontrado en Google Sheets (ya eliminado o nunca existió)`);
+                                materiasEnGoogleSheets.delete(id);
+                            }
+                        } catch (error) {
+                            console.log(`⚠️ ${id}: error al eliminar:`, error.message);
+                            materiasEnGoogleSheets.delete(id);
                         }
-                    } catch (error) {
-                        console.log(`⚠️ ${id}: error al eliminar:`, error.message);
+                    }
+                } catch (error) {
+                    console.error('❌ Error al obtener datos actuales de Google Sheets:', error);
+                    // Si no podemos verificar, intentar eliminar de todas formas
+                    for (const id of toDelete) {
+                        materiasEnGoogleSheets.delete(id);
                     }
                 }
             }
@@ -139,6 +207,12 @@
                     console.error('❌ Error al guardar:', errorText);
                     throw new Error(`Error HTTP ${response.status}: ${errorText}`);
                 }
+                
+                // Registrar las materias guardadas exitosamente
+                updates.forEach(update => {
+                    materiasEnGoogleSheets.add(update.id_materia);
+                    console.log(`📝 ${update.id_materia} registrado como guardado en Google Sheets`);
+                });
                 
                 console.log('✅ Materias activas guardadas exitosamente');
             }
