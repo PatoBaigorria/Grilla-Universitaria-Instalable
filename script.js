@@ -25,15 +25,10 @@
     // Cargar estados desde Google Sheets
     async function cargarDesdeSheet() {
         try {
-            console.log('Cargando datos desde Google Sheets...');
-            console.log('URL de la API:', SHEETDB_URL);
+            console.log('🔄 Cargando desde Google Sheets...');
             const res = await fetch(SHEETDB_URL);
-            console.log('Respuesta HTTP status:', res.status);
             const rows = await res.json();
-            console.log('Datos RAW recibidos de Google Sheets:', rows);
-            console.log('Tipo de datos recibidos:', typeof rows);
-            console.log('Es un array?', Array.isArray(rows));
-            console.log('Longitud del array:', rows.length);
+            console.log(`📥 Recibidas ${rows.length} filas de Google Sheets`);
             
             // Limpiar estados actuales
             estadosMaterias = {};
@@ -43,18 +38,18 @@
             rows.forEach((row, index) => {
                 if (row.id_materia === '_REINICIO_' && row.estado === 'reiniciado') {
                     ultimoReinicioIndex = index;
-                    console.log(`Marcador de reinicio encontrado en fila ${index}:`, row);
                 }
             });
             
             // Si hay un marcador de reinicio, solo procesar filas posteriores a él
             const startIndex = ultimoReinicioIndex >= 0 ? ultimoReinicioIndex + 1 : 0;
-            console.log(`Procesando desde fila ${startIndex} (${ultimoReinicioIndex >= 0 ? 'después del último reinicio' : 'desde el inicio'})`);
+            if (ultimoReinicioIndex >= 0) {
+                console.log('🔄 Encontrado marcador de reinicio, procesando solo datos posteriores');
+            }
             
             // Procesar cada fila de la hoja (solo las posteriores al último reinicio)
             for (let i = startIndex; i < rows.length; i++) {
                 const row = rows[i];
-                console.log(`Fila ${i}:`, row);
                 
                 if (row.id_materia && row.estado && row.id_materia !== '_REINICIO_') {
                     // Sobrescribir el estado anterior (el último en el array será el final)
@@ -62,19 +57,10 @@
                         cursando: row.estado === 'cursando',
                         aprobada: row.estado === 'aprobada'
                     };
-                    console.log(`Procesando ${row.id_materia}: ${row.estado}`);
                 }
             }
             
-            console.log('Procesamiento completado. Estados finales:', estadosMaterias);
-            
-            console.log('Estados cargados desde Sheet:', estadosMaterias);
-            console.log('Número de materias cargadas:', Object.keys(estadosMaterias).length);
-            
-            // Mostrar cada materia cargada individualmente
-            Object.entries(estadosMaterias).forEach(([id, estado]) => {
-                console.log(`Materia ${id}:`, estado);
-            });
+            console.log(`✅ Cargadas ${Object.keys(estadosMaterias).length} materias desde Google Sheets`);
             
             // NO aplicar estados aquí - se hará en el orden correcto desde inicializar()
             console.log('Estados cargados correctamente desde Google Sheets');
@@ -90,13 +76,16 @@
     // Guardar estados en Google Sheets
     async function guardarEnSheet() {
         try {
-            console.log('Guardando datos en Google Sheets...');
-            console.log('Estados actuales a guardar:', estadosMaterias);
+            console.log('💾 Guardando en Google Sheets...');
+            console.log(`📊 ${Object.keys(estadosMaterias).length} materias en memoria`);
             
-            // Preparar datos para enviar (solo materias con estado)
-            const updates = [];
+            // Separar materias en dos grupos: activas y a eliminar
+            const updates = []; // Materias con estado activo (cursando/aprobada)
+            const toDelete = []; // Materias que volvieron al estado inicial
+            
             Object.entries(estadosMaterias).forEach(([id, estado]) => {
                 if (estado.cursando || estado.aprobada) {
+                    // Materia con estado activo - agregar/actualizar
                     let estadoTexto = '';
                     if (estado.aprobada) estadoTexto = 'aprobada';
                     else if (estado.cursando) estadoTexto = 'cursando';
@@ -106,15 +95,39 @@
                         nombre: document.getElementById(id)?.textContent || id,
                         estado: estadoTexto
                     });
+                    console.log(`📝 ${id}: ${estadoTexto} (será guardado)`);
+                } else {
+                    // Materia en estado inicial - eliminar de Google Sheets
+                    toDelete.push(id);
+                    console.log(`🗑️ ${id}: estado inicial (será eliminado de Google Sheets)`);
                 }
             });
 
-            console.log('Datos a enviar a Google Sheets:', updates);
+            console.log(`📤 ${updates.length} materias para guardar, ${toDelete.length} para eliminar`);
 
-            // Nueva estrategia: Solo usar POST para agregar datos
-            // No intentamos limpiar la hoja, trabajamos con los datos existentes
+            // 1. Primero eliminar materias que volvieron al estado inicial
+            if (toDelete.length > 0) {
+                console.log('🗑️ Eliminando materias en estado inicial...');
+                for (const id of toDelete) {
+                    try {
+                        const deleteResponse = await fetch(`${SHEETDB_URL}/id_materia/${id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (deleteResponse.ok) {
+                            console.log(`✅ ${id}: eliminado de Google Sheets`);
+                        } else {
+                            console.log(`⚠️ ${id}: no se pudo eliminar (posiblemente no existía)`);
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ ${id}: error al eliminar:`, error.message);
+                    }
+                }
+            }
+
+            // 2. Luego guardar/actualizar materias con estado activo
             if (updates.length > 0) {
-                console.log('Guardando datos con POST...');
+                console.log('💾 Guardando materias con estado activo...');
                 const response = await fetch(SHEETDB_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -123,15 +136,16 @@
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('Error en POST:', errorText);
+                    console.error('❌ Error al guardar:', errorText);
                     throw new Error(`Error HTTP ${response.status}: ${errorText}`);
                 }
                 
-                const responseData = await response.json();
-                console.log('Respuesta de Google Sheets (POST):', responseData);
-            } else {
-                console.log('No hay datos para guardar - guardando marcador de reinicio...');
-                // Guardar un marcador especial que indique que el estado fue reiniciado
+                console.log('✅ Materias activas guardadas exitosamente');
+            }
+            
+            // 3. Si no hay materias activas, guardar marcador de reinicio
+            if (updates.length === 0 && Object.keys(estadosMaterias).length > 0) {
+                console.log('📝 No hay materias activas - guardando marcador de reinicio...');
                 const reinicioMarker = [{
                     id_materia: '_REINICIO_',
                     nombre: 'Estado Reiniciado',
@@ -151,8 +165,8 @@
                     throw new Error(`Error HTTP ${response.status}: ${errorText}`);
                 }
                 
-                console.log('Marcador de reinicio guardado exitosamente');
-            }
+                console.log('✅ Marcador de reinicio guardado exitosamente');
+            }    
             
             console.log('Datos guardados exitosamente en Google Sheets');
             mostrarMensajeFlash('Progreso guardado en Google Sheets', 'success');
@@ -624,13 +638,17 @@
     function configurarEventListeners() {
         console.log('Configurando event listeners para materias...');
         const todasLasMaterias = document.querySelectorAll('.materia');
+        console.log(`🔧 Encontradas ${todasLasMaterias.length} materias para configurar event listeners`);
         
-        todasLasMaterias.forEach(materia => {
+        todasLasMaterias.forEach((materia, index) => {
+            console.log(`🔧 Configurando listener para materia ${index + 1}: ${materia.id}`);
             materia.addEventListener('click', function () {
-                console.log(`Click en materia: ${this.id}`);
+                console.log(`🖱️ CLICK DETECTADO en materia: ${this.id}`);
+                console.log(`📊 Clases actuales de ${this.id}:`, Array.from(this.classList));
                 
                 // Verificar si la materia está bloqueada
                 if (this.classList.contains('bloqueada')) {
+                    console.log(`⚠️ ${this.id} tiene clase 'bloqueada', verificando si se permite el click...`);
                     // Para materias optativas: solo permitir click si tienen correlativas definidas
                     if (this.id.includes('optativa')) {
                         const correlativasData = this.getAttribute('data-correlativas');
@@ -656,53 +674,60 @@
                 if (!estadosMaterias[id]) {
                     estadosMaterias[id] = { cursando: false, aprobada: false };
                 }
-
-                // Ciclo de estados: bloqueada/vacío -> cursando -> aprobada -> vacío
-                if (!estadosMaterias[id].cursando && !estadosMaterias[id].aprobada) {
-                    // Vacío o bloqueada -> cursando
-                    estadosMaterias[id].cursando = true;
-                    estadosMaterias[id].aprobada = false;
-                    this.classList.remove('bloqueada');
-                    this.classList.add('cursando');
-                    console.log(`${id}: Vacío/Bloqueada -> CURSANDO`);
-                } else if (estadosMaterias[id].cursando) {
-                    // Cursando -> aprobada
-                    estadosMaterias[id].cursando = false;
-                    estadosMaterias[id].aprobada = true;
-                    this.classList.remove('cursando');
-                    this.classList.add('aprobada');
-                    console.log(`${id}: Cursando -> APROBADA`);
-                } else if (estadosMaterias[id].aprobada) {
-                    // Aprobada -> vacío (o bloqueada si es optativa)
-                    estadosMaterias[id].cursando = false;
-                    estadosMaterias[id].aprobada = false;
-                    this.classList.remove('aprobada');
-                    
-                    // Si es optativa, volver a bloqueada; si no, a habilitada
-                    if (this.id.includes('optativa')) {
-                        this.classList.add('bloqueada');
-                        console.log(`${id}: Aprobada -> BLOQUEADA (optativa)`);
-                    } else {
-                        console.log(`${id}: Aprobada -> HABILITADA`);
-                    }
+                
+                const estado = estadosMaterias[id];
+                console.log(`🖱️ CLICK DETECTADO en materia: ${id}`);
+                console.log(`📊 Estado actual de ${id}:`, estado);
+                
+                // Ciclar estados: bloqueada -> cursando -> aprobada -> bloqueada
+                if (!estado.cursando && !estado.aprobada) {
+                    // De bloqueada a cursando
+                    estado.cursando = true;
+                    estado.aprobada = false;
+                    console.log(`🟡 ${id}: bloqueada → cursando`);
+                } else if (estado.cursando && !estado.aprobada) {
+                    // De cursando a aprobada
+                    estado.cursando = false;
+                    estado.aprobada = true;
+                    console.log(`🟢 ${id}: cursando → aprobada`);
+                } else {
+                    // De aprobada a bloqueada
+                    estado.cursando = false;
+                    estado.aprobada = false;
+                    console.log(`⚪ ${id}: aprobada → bloqueada`);
                 }
-
+                
+                console.log(`📊 Nuevo estado de ${id}:`, estado);
+                
+                // Actualizar clases CSS
+                this.classList.remove('cursando', 'aprobada');
+                if (estado.cursando) this.classList.add('cursando');
+                if (estado.aprobada) this.classList.add('aprobada');
+                console.log(`🎨 Clases CSS actualizadas para ${id}:`, Array.from(this.classList));
+                
                 // Aplicar estilos
                 aplicarEstilos(this);
                 
-                // Revisar correlatividades y actualizar progreso
+                // Revisar correlatividades y actualizar barra
                 revisarCorrelativas();
                 actualizarBarraProgreso();
                 
-                // Nota: El guardado en Google Sheets es solo manual (botón "Guardar progreso")
-                console.log(`Estado final de ${id}:`, estadosMaterias[id]);
+                // Guardar automáticamente
+                console.log(`💾 INICIANDO GUARDADO AUTOMÁTICO para ${id}...`);
+                guardarEnSheet().then(exito => {
+                    if (exito) {
+                        console.log(`✅ ${id}: Guardado automático EXITOSO`);
+                    } else {
+                        console.error(`❌ ${id}: Guardado automático FALLÓ`);
+                    }
+                }).catch(error => {
+                    console.error(`❌ ${id}: Error en guardado automático:`, error);
+                });
             });
         });
         
         console.log(`Event listeners configurados para ${todasLasMaterias.length} materias`);
     }
-
-    // ========== MENSAJES FLASH ==========
     
     function mostrarMensajeFlash(mensaje, tipo = 'success', duracion = 3000) {
         // Usar el elemento flashMessage existente en el HTML
