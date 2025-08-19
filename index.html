@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#a5374e" />
+    <!-- Meta tags para evitar caché -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Mi Plan de Estudios Interactivo</title>
+    <link rel="icon" href="./pi.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="./style.css" id="main-css" />
+</head>
+
+<body>
+    <div class="container-fluid my-4">
+        <div class="text-center mb-4 position-relative">
+            <h1 style="color: #a5374e; display: inline-block; vertical-align: middle;">Licenciatura en Ciencias
+                Matemáticas 🤓</h1>
+            <div id="flashMessage" class="flash-message"
+                style="display: none; position: absolute; right: 10%; top: 50%; transform: translateY(-50%);"></div>
+        </div>
+
+        <div class="row">
+            <!-- PRIMER AÑO -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="p-3 year-column">
+                    <h2 class="year-title">Primer Año</h2>
+                    <hr />
+                    <div class="row">
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">1º Cuatrimestre</h3>
+                            <div class="materia" id="algebra-1">Álgebra I</div>
+                            <div class="materia mt-2" id="calculo-1">Cálculo I</div>
+                            <div class="materia mt-2" id="matematica-computacion-1">Matemática y Computación I</div>
+                            <div class="materia mt-2" id="ingles">Inglés</div>
+                        </div>
+
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">2º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="matematica-discreta" data-correlativas='[
+                {"id":"algebra-1","estado":"cursando"}
+              ]'>Matemática Discreta</div>
+
+                            <div class="materia mt-2 bloqueada" id="algebra-2" data-correlativas='[
+                {"id":"algebra-1","estado":"cursando"}
+              ]'>Álgebra II</div>
+
+                            <div class="materia mt-2" id="seminario">Seminario</div>
+                            <div class="materia mt-2" id="ingles-2">Inglés</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEGUNDO AÑO -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="p-3 year-column">
+                    <h2 class="year-title">Segundo Año</h2>
+                    <hr />
+                    <div class="row">
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">1º Cuatrimestre</h3>
+
+                            <div class="materia bloqueada mt-2" id="fundamentos"
+                                data-correlativas='[{"id":"calculo-1","estado":"aprobada"}, {"id":"algebra-1","estado":"aprobada"}, {"id":"seminario","estado":"cursando"}, {"id":"matematica-discreta","estado":"cursando"}]'>
+                                Fundamentos</div>
+                            <div class="materia mt-2 bloqueada" id="calculo-2"
+                                data-correlativas='[{"id":"algebra-1","estado":"cursando"}, {"id":"calculo-1","estado":"cursando"}]'>
+                                Cálculo II</div>
+                            <div class="materia bloqueada mt-2" id="probabilidad-y-estadistica"
+                                data-correlativas='[{"id":"algebra-1","estado":"cursando"}, {"id":"calculo-1","estado":"cursando"}]'>
+                                Probabilidad y Estadística
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">2º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="calculo-3"
+                                data-correlativas='[{"id":"algebra-1","estado":"aprobada"}, {"id":"calculo-1","estado":"aprobada"}, {"id":"seminario","estado":"aprobada"}, {"id":"calculo-2","estado":"cursando"}, {"id":"algebra-2","estado":"cursando"}]'>
+                                Cálculo III</div>
+                            <div class="materia bloqueada mt-2" id="modelos-matematicos"
+                                data-correlativas='[{"id":"algebra-2","estado":"aprobada"}, {"id":"calculo-1","estado":"aprobada"}, {"id":"matematica-discreta","estado":"aprobada"}, {"id":"fundamentos","estado":"cursando"}]'>
+                                Modelos Matemáticos</div>
+                            <div class="materia bloqueada mt-2" id="calculo-numerico"
+                                data-correlativas='[{"id":"algebra-1","estado":"aprobada"}, {"id":"calculo-1","estado":"aprobada"}, {"id":"matematica-computacion-1","estado":"aprobada"}, {"id":"algebra-2","estado":"cursando"}]'>
+                                Cálculo Numérico</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TERCER AÑO -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="p-3 year-column">
+                    <h2 class="year-title">Tercer Año</h2>
+                    <hr />
+                    <div class="row">
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">1º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="calculo-avanzado-1"
+                                data-correlativas='[{"id":"calculo-2","estado":"aprobada"}, {"id":"algebra-2","estado":"aprobada"}, {"id":"fundamentos","estado":"cursando"}, {"id":"calculo-3","estado":"cursando"}]'>
+                                Cálculo Avanzado I</div>
+                            <div class="materia bloqueada mt-2" id="algebra-3"
+                                data-correlativas='[{"id":"algebra-2","estado":"aprobada"}, {"id":"matematica-discreta","estado":"aprobada"}, {"id":"fundamentos","estado":"cursando"}]'>
+                                Álgebra III</div>
+                            <div class="materia bloqueada mt-2" id="matematica-computacion-2"
+                                data-correlativas='[{"id":"matematica-computacion-1","estado":"aprobada"}, {"id":"calculo-numerico","estado":"cursando"}, {"id":"calculo-3","estado":"cursando"}, {"id":"calculo-1","estado":"aprobada"}, {"id":"algebra-2","estado":"aprobada"}]'>
+                                Matemática y Computación II</div>
+                        </div>
+
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">2º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="calculo-avanzado-2"
+                                data-correlativas='[{"id":"calculo-3","estado":"aprobada"}, {"id":"algebra-2","estado":"aprobada"}, {"id":"calculo-avanzado-1","estado":"cursando"}]'>
+                                Cálculo Avanzado II</div>
+                            <div class="materia bloqueada mt-2" id="algebra-4"
+                                data-correlativas='[{"id":"algebra-2","estado":"aprobada"}, {"id":"algebra-3","estado":"cursando"}]'>
+                                Álgebra IV</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CUARTO AÑO -->
+            <div class="col-lg-3 col-md-6 mb-4">
+                <div class="p-3 year-column">
+                    <h2 class="year-title">Cuarto Año</h2>
+                    <hr />
+                    <div class="row">
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">1º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="materia-optativa-1">Materia Optativa I</div>
+                            <div class="materia bloqueada mt-2" id="variable-compleja"
+                                data-correlativas='[{"id":"calculo-3","estado":"aprobada"}, {"id":"calculo-avanzado-1","estado":"cursando"}]'>
+                                Variable Compleja y Análisis de Fourier</div>
+                            <div class="materia bloqueada mt-2" id="medida-integracion"
+                                data-correlativas='[{"id":"calculo-3","estado":"aprobada"}, {"id":"calculo-avanzado-1","estado":"cursando"}]'>
+                                Medida e Integración</div>
+                        </div>
+
+                        <div class="col-6">
+                            <h3 class="semester-title mt-4">2º Cuatrimestre</h3>
+                            <div class="materia bloqueada mt-2" id="materia-optativa-2">Materia Optativa II</div>
+                            <div class="materia bloqueada mt-2" id="ecuaciones-fisica"
+                                data-correlativas='[{"id":"variable-compleja","estado":"cursando"}, {"id":"medida-integracion","estado":"cursando"}, {"id":"calculo-avanzado-1","estado":"aprobada"}]'>
+                                Ecuaciones de la Física - Matemática</div>
+                            <div class="materia bloqueada mt-2" id="geometria-diferencial"
+                                data-correlativas='[{"id":"algebra-2","estado":"aprobada"}, {"id":"calculo-avanzado-2","estado":"cursando"}, {"id":"fundamentos","estado":"aprobada"}]'>
+                                Geometría Diferencial</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de progreso -->
+    <div class="container">
+        <div class="progress-container my-5">
+            <div class="progress-stats">
+                <div class="progress-title">Progreso de la carrera</div>
+                <div class="progress-percentage">0%</div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" style="width: 0%"></div>
+                </div>
+
+
+                <div class="progress-details">
+                    <span class="materias-aprobadas">0</span> de <span class="total-materias">0</span> materias
+                    aprobadas
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="d-flex justify-content-center mt-4 flex-wrap">
+                <button id="guardarBtn" class="btn btn-primary mx-2 mb-2">Guardar progreso</button>
+                <button id="deshacerBtn" class="btn btn-secondary mx-2 mb-2" disabled>Deshacer</button>
+                <button id="reiniciarBtn" class="btn btn-danger mx-2 mb-2">Reiniciar materias</button>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Modal de felicitaciones -->
+    <div class="modal fade" id="congratsModal" tabindex="-1" aria-labelledby="congratsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content celebration-modal">
+                <div class="modal-header">
+                    <h2 class="modal-title w-100 text-center" id="congratsModalLabel">¡FELICITACIONES!</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <h3>¡Has completado el 100% de la carrera!</h3>
+                    <p class="celebration-text">Licenciatura en Ciencias Matemáticas</p>
+                    <div class="celebration-icon">🎓</div>
+                    <p class="mt-4">Has aprobado todas las materias de la carrera. ¡Felicitaciones por este increíble
+                        logro!</p>
+                </div>
+                <!-- Modal footer eliminado -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación de reinicio -->
+    <div class="modal fade" id="reinicioModal" tabindex="-1" aria-labelledby="reinicioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="reinicioModalLabel">Confirmar reinicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de que quieres reiniciar todas las materias a su estado inicial?</p>
+                    <p><strong>Esta acción no se puede deshacer.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmarReinicioBtn">Reiniciar materias</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Forzar recarga de archivos CSS y JS para evitar caché
+        const timestamp = new Date().getTime();
+        
+        // Actualizar CSS con timestamp
+        const cssLink = document.getElementById('main-css');
+        if (cssLink) {
+            cssLink.href = `./style.css?v=${timestamp}`;
+        }
+        
+        // Cargar JS con timestamp
+        const confettiScript = document.createElement('script');
+        confettiScript.src = `./confetti.js?v=${timestamp}`;
+        document.head.appendChild(confettiScript);
+        
+        // Cargar script principal
+        const mainScript = document.createElement('script');
+        mainScript.src = './script.js';
+        document.head.appendChild(mainScript);
+        
+        // Service Worker con actualización forzada
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => {
+                    console.log('✅ Service Worker registrado', reg);
+                    
+                    // Forzar actualización si hay una nueva versión
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('🔄 Nueva versión del Service Worker disponible, actualizando...');
+                                // Forzar la activación del nuevo service worker
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                                // Recargar la página para usar la nueva versión
+                                window.location.reload();
+                            }
+                        });
+                    });
+                    
+                    // Verificar actualizaciones cada vez que se carga la página
+                    reg.update();
+                })
+                .catch(err => console.error('❌ Error al registrar el Service Worker', err));
+        }
+    </script>
+
+</body>
+
+</html>

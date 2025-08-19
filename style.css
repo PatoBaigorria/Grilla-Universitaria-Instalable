@@ -1,0 +1,380 @@
+body {
+    background-color: #fff0f5;
+    /* Un fondo rosa muy pálido (Lavender Blush) */
+    font-size: 16px;
+    overflow-x: hidden;
+}
+
+/* Ajustes responsivos para tablets */
+@media (max-width: 1024px) {
+    body {
+        font-size: 14px;
+    }
+
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+    }
+}
+
+.materia {
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    border: 2px solid transparent;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 10px;
+    word-wrap: break-word;
+    hyphens: auto;
+    /* Colores se definirán con clases específicas */
+}
+
+/* Ajustes responsivos para materias en tablets */
+@media (max-width: 1024px) {
+    .materia {
+        padding: 12px 8px;
+        font-size: 0.9rem;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .year-column {
+        margin-bottom: 15px;
+    }
+
+    .year-title {
+        font-size: 1.5rem;
+    }
+
+    .semester-title {
+        font-size: 1rem;
+    }
+}
+
+/* ========== ESTADOS DE MATERIAS - SISTEMA LIMPIO ========== */
+
+/* MATERIAS HABILITADAS - Rosa fuerte (estado por defecto cuando no está bloqueada, cursando o aprobada) */
+.materia {
+    background-color: #ffc0cb !important; /* Rosa fuerte */
+    color: #a5374e !important; /* Texto rosa oscuro */
+}
+
+/* Regla adicional más específica para materias habilitadas */
+.materia:not(.bloqueada):not(.cursando):not(.aprobada) {
+    background-color: #ffc0cb !important; /* Rosa fuerte */
+    color: #a5374e !important; /* Texto rosa oscuro */
+}
+
+/* MATERIAS BLOQUEADAS - Gris */
+.materia.bloqueada {
+    background-color: #d0d0d0 !important;
+    color: #1a1a1a !important; /* Gris muy oscuro para mejor legibilidad */
+    opacity: 0.6;
+    cursor: not-allowed !important;
+}
+
+/* MATERIAS CURSANDO - Rosa claro */
+.materia.cursando {
+    background-color: #ffe4e1 !important;
+    color: #a5374e !important;
+    cursor: pointer !important;
+}
+
+/* MATERIAS APROBADAS - Rosa claro con texto grisáceo */
+.materia.aprobada {
+    background-color: #ffe4e1 !important;
+    color: #9e737b !important;
+    cursor: pointer !important;
+}
+
+/* Efecto hover para todas las materias, incluyendo las bloqueadas */
+.materia:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* ESTADO 1 (CURSANDO) - Borde más oscuro y color rosa principal */
+/* Esta regla debe ser lo suficientemente específica para sobrescribir el gris o el rosa base */
+/* Estado inicial (gris) ya está por defecto en .materia */
+
+/* Estilos para la barra de progreso */
+.progress-container {
+    max-width: 800px;
+    margin: 0 auto 30px;
+    padding: 15px 20px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+/* Ajustes responsivos para la barra de progreso en tablets */
+@media (max-width: 1024px) {
+    .progress-container {
+        max-width: 95%;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+    }
+
+    .progress-title {
+        font-size: 1rem;
+    }
+
+    .progress-percentage {
+        font-size: 1.3rem;
+    }
+
+    .progress-bar-outer {
+        height: 10px;
+    }
+
+    .progress-details {
+        font-size: 0.8rem;
+    }
+}
+
+.progress-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.progress-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.progress-percentage {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #a5374e;
+    background: linear-gradient(45deg, #a5374e, #ff6b8b);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.progress-bar-container {
+    position: relative;
+}
+
+.progress-bar-outer {
+    height: 12px;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, #a5374e, #ff6b8b);
+    border-radius: 10px;
+    transition: width 1s ease-in-out;
+    position: relative;
+}
+
+.progress-bar-inner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.progress-details {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.materias-aprobadas {
+    font-weight: 600;
+    color: #a5374e;
+}
+
+.materia.cursando {
+    background-color: #ffe4e1;
+    /* Rosa claro */
+    color: #a5374e;
+    border: none;
+    text-decoration: none;
+}
+
+.materia.aprobada {
+    background-color: #ffe4e1 !important;
+    color: #9e737b !important;
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    border: none !important;
+    box-shadow: none;
+}
+
+.materia.habilitada {
+    background-color: #ffc0cb !important;
+    color: #a5374e !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+
+
+
+/* Estilos de Contenedores de Años y Cuatrimestres (sin cambios si ya los tienes así) */
+.year-column {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    padding-bottom: 1rem;
+}
+
+.year-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    color: #343a40;
+    text-align: center;
+}
+
+.semester-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #6c757d;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 5px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+/* Estilos para el modal de felicitaciones */
+.celebration-modal {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.celebration-modal .modal-header {
+    background: linear-gradient(90deg, #a5374e, #ff6b8b);
+    color: white;
+    border-bottom: none;
+    padding: 20px;
+}
+
+.celebration-modal .modal-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    letter-spacing: 2px;
+}
+
+.celebration-modal .modal-body {
+    padding: 30px;
+}
+
+.celebration-text {
+    font-size: 1.3rem;
+    color: #666;
+    margin-top: 10px;
+}
+
+.celebration-icon {
+    font-size: 5rem;
+    margin: 20px 0;
+    animation: bounce 1s infinite alternate;
+}
+
+/* Ajustes responsivos para el modal en tablets */
+@media (max-width: 1024px) {
+    .celebration-modal .modal-title {
+        font-size: 2rem;
+    }
+
+    .celebration-text {
+        font-size: 1.1rem;
+    }
+
+    .celebration-icon {
+        font-size: 4rem;
+        margin: 15px 0;
+    }
+
+    .celebration-modal .modal-body {
+        padding: 20px;
+    }
+}
+
+@keyframes bounce {
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(-15px);
+    }
+}
+
+.celebration-modal .btn-primary {
+    background: linear-gradient(90deg, #a5374e, #ff6b8b);
+    border: none;
+    border-radius: 30px;
+    padding: 10px 30px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(165, 55, 78, 0.3);
+    transition: all 0.3s ease;
+}
+
+.celebration-modal .btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 20px rgba(165, 55, 78, 0.4);
+}
+
+/* Estilos para el mensaje flash */
+.flash-message {
+    position: relative;
+    padding: 15px 30px;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    z-index: 9999;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.5s ease-in-out;
+    max-width: 400px;
+}
+
+.flash-success {
+    background-color: #28a745;
+}
+
+.flash-error {
+    background-color: #dc3545;
+}
+
+.flash-info {
+    background-color: #17a2b8;
+}
